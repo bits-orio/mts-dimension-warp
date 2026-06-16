@@ -24,17 +24,25 @@ local function update_warp_platform_size()
 end
 dw.update_warp_platform_size = update_warp_platform_size
 
-local function teleport_platform()
-    if storage.warp.status ~= defines.warp.warping then return end
+-- v1 CORE port: PER-TEAM platform clone. Threaded (force_name, ctx) from the
+-- warp.lua call site (dw.teleport_platform(force_name, ctx)). Every flat
+-- storage.warp.* / storage.platform.* read is now ctx.warp.* / ctx.platform.*
+-- so the clone moves THIS team's base from its previous surface to its current
+-- one. The clone_area calls themselves are byte-faithful to upstream -- only the
+-- source/destination surfaces (ctx.previous -> ctx.current) and the status guard
+-- changed. The vehicle/train/player/K2-shelter handling is untouched, just
+-- sourced from the ctx surfaces.
+local function teleport_platform(force_name, ctx)
+    if ctx.warp.status ~= defines.warp.warping then return end
 
-    local platform_area = math2d.bounding_box.create_from_centre({0, 0}, storage.platform.warp.size, storage.platform.warp.size)
-    local platform_area_delta = math2d.bounding_box.create_from_centre({0, 0}, storage.platform.warp.size + 2, storage.platform.warp.size + 2)
+    local platform_area = math2d.bounding_box.create_from_centre({0, 0}, ctx.platform.warp.size, ctx.platform.warp.size)
+    local platform_area_delta = math2d.bounding_box.create_from_centre({0, 0}, ctx.platform.warp.size + 2, ctx.platform.warp.size + 2)
 
-    local source = storage.warp.previous.surface
-    local destination = storage.warp.current.surface
+    local source = ctx.warp.previous.surface
+    local destination = ctx.warp.current.surface
 
     --- if destination is nauvis, evict any players inside the platform area before cloning
-    if storage.warp.current.planet == "nauvis" then
+    if ctx.warp.current.planet == "nauvis" then
         local nauvis_surface = game.planets.nauvis.surface
         if nauvis_surface then
             local players_in_area = nauvis_surface.find_entities_filtered{area = platform_area, type = "character"}
@@ -111,12 +119,12 @@ local function teleport_platform()
         if player.physical_surface.name == source.name then
             if math2d.bounding_box.contains_point(platform_area_delta, player.physical_position) or player.controller_type == defines.controllers.ghost then
                 if player.controller_type == defines.controllers.ghost then
-                    dw.safe_teleport(player, storage.warp.current.surface, {0, 0}, true)
+                    dw.safe_teleport(player, destination, {0, 0}, true)
                 else
-                    dw.safe_teleport(player, storage.warp.current.surface, player.physical_position, true)
+                    dw.safe_teleport(player, destination, player.physical_position, true)
                 end
             else
-                if storage.warp.previous.surface.planet.name ~= "nauvis" then
+                if source.planet.name ~= "nauvis" then
                     player.character.die()
                 end
             end
@@ -158,7 +166,7 @@ local function teleport_platform()
     end
 
     --- clone the left entities (includes biters... ?)
-    storage.warp.previous.surface.clone_area{
+    source.clone_area{
         source_area = platform_area,
         destination_area = platform_area,
         destination_surface = destination,
@@ -208,7 +216,10 @@ local function teleport_platform()
         end
     end
 
-    dw.update_surfaces_properties()
+    -- Retire the previous surface for THIS team (idempotent with warp.lua's own
+    -- post-clone call: the first invocation flips ctx.warp.status to awaiting, so
+    -- the other is a guarded no-op -- exactly one retire happens).
+    dw.update_surfaces_properties(force_name, ctx)
 end
 dw.teleport_platform = teleport_platform
 

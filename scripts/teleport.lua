@@ -1,5 +1,10 @@
 --- Teleport mechanics are all here
 ------------------------------------------------------------
+-- v1 CORE port: teleport is now PER-TEAM. A player's team is their force
+-- (player.force.name); their warp context is dw.warp_ctx(force_name). Surfaces
+-- are routed back to their owning team through the surface-index reverse map
+-- (dw.surface_owner) so a teleporter/route only fires for the team that owns
+-- both endpoints.
 
 non_player_controllers = {
     [defines.controllers.god] = true,
@@ -7,6 +12,15 @@ non_player_controllers = {
     [defines.controllers.spectator] = true,
     [defines.controllers.remote] = true,
 }
+
+-- Resolve the warp context that owns a surface, or nil if the surface isn't a
+-- tracked team surface. Uses the O(1) surface-index reverse map.
+local function ctx_for_surface(surface)
+    if not (surface and surface.valid) then return nil end
+    local owner = dw.surface_owner(surface.index)
+    if not owner then return nil end
+    return dw.warp_ctx(owner), owner
+end
 
 --- contain everything related to player teleport between surfaces
 local function safe_teleport(player_or_vehicle, surface, position, force_teleport)
@@ -19,8 +33,11 @@ local function safe_teleport(player_or_vehicle, surface, position, force_telepor
     if not surface then return end
     if is_player and non_player_controllers[controller_type] and not force_teleport then return end
 
-    -- prevent teleporting from anywhere to the surface if we are currently in warp
-    if storage.warp.status ~= defines.warp.awaiting and surface.name == storage.warp.previous.name then
+    -- prevent teleporting from anywhere to the surface if we are currently in warp.
+    -- Route via the destination surface's owning team context.
+    local ctx = ctx_for_surface(surface)
+    if ctx and ctx.warp.status ~= defines.warp.awaiting
+        and ctx.warp.previous and surface.name == ctx.warp.previous.name then
         if is_player then player_or_vehicle.print({"dw-messages.warp-no-teleport"}) end
         return
     end
@@ -28,7 +45,13 @@ local function safe_teleport(player_or_vehicle, surface, position, force_telepor
     position = surface.find_non_colliding_position(type, position, 5, 0.5, false) or position
     player_or_vehicle.teleport(position, surface)
 
-    storage.players_last_teleport[index] = game.tick
+    -- Record anti-spam against the teleporting player's team context (fall back to
+    -- the destination's team for vehicles, whose force may not be a tracked team).
+    local from_ctx = is_player and dw.has_warp_ctx(player_or_vehicle.force.name)
+        and dw.warp_ctx(player_or_vehicle.force.name) or ctx
+    if from_ctx then
+        from_ctx.players_last_teleport[index] = game.tick
+    end
 end
 dw.safe_teleport = safe_teleport
 
@@ -37,15 +60,19 @@ local function check_player_teleport()
     for player_index, player in pairs(game.connected_players) do
         if not player.walking_state.walking and not player.driving then goto continue end
 
+        -- A player's warp context is their team's. Skip players not on a tracked team.
+        if not dw.has_warp_ctx(player.force.name) then goto continue end
+        local ctx = dw.warp_ctx(player.force.name)
+
         -- prevent teleport spam
-        if (storage.players_last_teleport[player_index] or 0) > game.tick - 20 then
+        if (ctx.players_last_teleport[player_index] or 0) > game.tick - 20 then
             goto continue
         end
 
         -- use the bounding box to determine the size of the check area
         local position = player.physical_position
         local bounding_box = player.character and player.character.bounding_box
-        
+
         if player.driving then
             local vehicle = (player.controller_type ~= defines.controllers.remote) and player.physical_vehicle or player.vehicle
             if not vehicle then goto continue end
@@ -62,12 +89,12 @@ local function check_player_teleport()
             {position.x - entity_size, position.y - entity_size},
             {position.x + entity_size, position.y + entity_size}
         }
-        
+
         local entities = player.surface.find_entities_filtered{area = check_area, subgroup="warpgate"}
 
         --- is the entities found an active teleporter ?
         for _, found_entity in pairs(entities) do
-            for _, teleporter in pairs(storage.teleporter) do
+            for _, teleporter in pairs(ctx.teleporter) do
                 if not teleporter.active then goto continue_teleport end
                 if not teleporter.from.valid or not teleporter.to.valid then goto continue_teleport end
                 if player.surface.name ~= teleporter.from.surface.name then goto continue_teleport end
@@ -109,8 +136,10 @@ end
 --- Make sure that dead player on any old surface is moved to the new surface
 local function dead_on_previous_surface(event)
     local player = game.players[event.player_index]
-    if player.surface.name ~= storage.warp.current.name then
-        player.teleport({0, 0}, storage.warp.current.name)
+    if not dw.has_warp_ctx(player.force.name) then return end
+    local ctx = dw.warp_ctx(player.force.name)
+    if ctx.warp.current.name and player.surface.name ~= ctx.warp.current.name then
+        player.teleport({0, 0}, ctx.warp.current.name)
     end
 end
 
@@ -120,17 +149,13 @@ local function teleport_safely_player_on_event(event)
     local player = game.players[event.player_index]
 
     --- make sure to teleport any new player to the current warp surface
-    if storage.nauvis_lab_exploded then
-        if not dw.safe_surfaces[player.surface.name] then
-            local previous_surface = player.physical_surface
-            safe_teleport(player, storage.warp.current.surface, {0, 0}, true)
-            if previous_surface == "nauvis" and storage.all_players_left_nauvis then game.surfaces.nauvis.clear() end
+    if dw.has_warp_ctx(player.force.name) then
+        local ctx = dw.warp_ctx(player.force.name)
+        if ctx.nauvis_lab_exploded and ctx.warp.current.surface then
+            if not dw.safe_surfaces[player.surface.name] then
+                safe_teleport(player, ctx.warp.current.surface, {0, 0}, true)
+            end
         end
-    end
-
-    --- only display for first character.
-    if player.index == 1 and not storage.nauvis_lab_exploded then
-        game.print({"dw-messages.intro"}, {color=util.color(defines.hexcolor.orange.. 'd9')})
     end
 end
 

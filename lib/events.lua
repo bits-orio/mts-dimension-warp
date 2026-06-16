@@ -57,6 +57,34 @@ dw.fire_event = function(event, event_data)
     end
 end
 
+--- Per-team tick dispatch (ADDITIVE -- does not touch the singleton path above).
+---
+--- Upstream Dimension Warp was single-team: every on_nth_tick handler ran once
+--- against the flat globals. In MTS Dimension Warp warp state is per-team inside
+--- storage.teams[force_name] (see scripts/warp_ctx.lua). A ported per-team handler
+--- needs to run once *per team* each period, against that team's ctx.
+---
+--- register_team_tick(nth, fn) registers a single on_nth_tick_<nth> handler (reusing
+--- the proven dw.register_event path -- no new engine API, just the same
+--- script.on_nth_tick fan-out) whose body iterates storage.teams and calls
+--- fn(force_name, ctx, event_data) for every team that has a context. Teams only
+--- appear in storage.teams once dw.warp_ctx() created their bundle, so "has a ctx"
+--- is exactly "present in storage.teams" -- no extra existence check needed.
+---
+--- The existing dw.register_event("on_nth_tick_XXX", ...) path is unchanged: any
+--- handler NOT ported to register_team_tick still fires once as a singleton, exactly
+--- as before. Only NEW per-team handlers (slice 3+) opt into this facility.
+dw.register_team_tick = function(nth, fn)
+    dw.register_event("on_nth_tick_" .. nth, function(event_data)
+        -- storage.teams may not exist before on_init; guard so an early tick is a
+        -- no-op rather than an error.
+        if not storage.teams then return end
+        for force_name, ctx in pairs(storage.teams) do
+            fn(force_name, ctx, event_data)
+        end
+    end)
+end
+
 script.on_init(function(event) dw.fire_event("on_init", event) end)
 script.on_load(function(event) dw.fire_event("on_load", event) end)
 script.on_configuration_changed(function(event) dw.fire_event("on_configuration_changed", event) end)

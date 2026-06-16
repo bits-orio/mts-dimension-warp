@@ -162,7 +162,14 @@ require "scripts.platforms.dimensions"
 require "scripts.platforms.harvesters"
 
 require "scripts.scenario.freeplay"
-require "scripts.scenario.lab_intro"
+-- v1: lab_intro DISABLED. The single-team intro built an exploding lab on the
+-- SHARED nauvis and pre-created neo-nauvis at on_init, clashing with the MTS
+-- per-team spawn. The warp #0 adoption (mts_lifecycle on_team_surface_created)
+-- replaces it: each team starts ON its adopted dimension home with
+-- ctx.nauvis_lab_exploded already true. Nothing else requires lab_intro -- its
+-- functions are only ever wired as its own event handlers -- so dropping the
+-- require fully removes it.
+-- require "scripts.scenario.lab_intro"
 require "scripts.scenario.victory"
 
 require "scripts.warp"
