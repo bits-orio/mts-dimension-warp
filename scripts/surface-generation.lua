@@ -116,54 +116,47 @@ local function generate_surface(force_name, ctx, target)
     local mapgen = table.deepcopy(base_mapgen)
     mapgen.seed = fairness_seed(planet, next_number)
 
-    -- Record the previous surface (so it can be retired after the platform
-    -- clone) and advance the warp counter / current placeholder.
-    ctx.warp.previous = ctx.warp.current
-    ctx.warp.number = next_number
-    ctx.warp.current = {
-        name          = nil,
-        planet        = planet,
-        surface       = nil,
-        surface_index = nil,
-    }
-
-    -- Ask MTS to create this team's EPHEMERAL surface for the base planet. MTS
-    -- performs creation (game.create_surface with OUR map_gen_settings, seed
-    -- included), ownership registration, planet association, visibility and the
-    -- on_team_surface_created event, then returns the created surface name.
+    -- Create the new surface FIRST, BEFORE advancing ctx.warp.current. This is
+    -- critical: create_team_surface synchronously fires on_team_surface_created,
+    -- and MDW's adoption handler only skips when ctx.warp.current.surface is set.
+    -- If we blanked current before the create, the brand-new warp surface would
+    -- be wrongly re-adopted as warp #0 (resetting the warp number AND leaving the
+    -- previous/current pair pointed at the same surface -> clone_area collide).
+    -- Keeping current pointed at the team's existing surface during the create
+    -- makes the adoption correctly skip it.
     --
-    -- The name MUST be NON-VARIANT (not mts-<planet>-N / team-N-<planet>), or
-    -- MTS's normalize_variant_seed would clobber our deterministic seed. The
-    -- 'mdw-<planet>-w<warp_number>' scheme is unique per (planet, warp) and never
-    -- matches a variant pattern, so MTS honors our seed at creation -- NO
+    -- The name MUST be NON-VARIANT (not mts-<planet>-N / team-N-<planet>) so MTS's
+    -- normalize_variant_seed honors our deterministic seed. 'mdw-<planet>-w<N>' is
+    -- unique per (planet, warp) and never matches a variant pattern -- NO
     -- post-create re-pin is needed (ADR-0005 fairness holds from birth).
     local surface_name = remote.call("mts-v1", "create_team_surface", force_name, {
         name             = 'mdw-' .. planet .. '-w' .. next_number,
         planet           = planet,
         map_gen_settings = mapgen,
     })
-
     local surface = surface_name and game.surfaces[surface_name]
     if not (surface and surface.valid) then
-        -- Creation failed: roll the warp counter back so we don't strand the
-        -- team with a half-advanced, surfaceless context.
-        ctx.warp.current = ctx.warp.previous
-        ctx.warp.previous = nil
-        ctx.warp.number = next_number - 1
-        return false
+        return false  -- create failed; nothing advanced, caller drops back to awaiting
     end
 
+    -- Create succeeded: NOW advance. previous = the surface we are leaving,
+    -- current = the freshly created one (distinct surfaces -> clone is valid).
+    ctx.warp.previous = ctx.warp.current
+    ctx.warp.number   = next_number
+    ctx.warp.current  = {
+        name          = surface.name,
+        planet        = planet,
+        surface       = surface,
+        surface_index = surface.index,
+    }
     surface.localised_name = game.planets[planet].prototype.localised_name
-    ctx.warp.current.name          = surface.name
-    ctx.warp.current.surface       = surface
-    ctx.warp.current.surface_index = surface.index
 
     -- Route this surface's engine events back to the owning team in O(1).
     dw.set_surface_owner(surface.index, force_name)
 
-    dw.rampant.check_surface_processed(ctx.warp.current.surface)
-    ctx.warp.current.surface.request_to_generate_chunks({x = 0, y = 0}, ctx.platform.warp.size / 32 + 1)
-    ctx.warp.current.surface.force_generate_chunk_requests()
+    dw.rampant.check_surface_processed(surface)
+    surface.request_to_generate_chunks({x = 0, y = 0}, ctx.platform.warp.size / 32 + 1)
+    surface.force_generate_chunk_requests()
     return true
 end
 dw.generate_surface = generate_surface

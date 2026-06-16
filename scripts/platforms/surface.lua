@@ -52,6 +52,12 @@ local function teleport_platform(force_name, ctx)
     local source = ctx.warp.previous.surface
     local destination = ctx.warp.current.surface
 
+    -- TEMP DIAG: the clone requires two DISTINCT surfaces (else "source/dest
+    -- collide"). Log both so any remaining mix-up is visible. Remove once stable.
+    log("[mts-dimension-warp:DIAG] teleport_platform source="
+        .. (source and (source.name .. "#" .. source.index) or "nil") .. " dest="
+        .. (destination and (destination.name .. "#" .. destination.index) or "nil"))
+
     --- if destination is nauvis, evict any players inside the platform area before cloning
     if ctx.warp.current.planet == "nauvis" then
         local nauvis_surface = game.planets.nauvis.surface
