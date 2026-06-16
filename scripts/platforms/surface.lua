@@ -1,24 +1,30 @@
 --- All surface platform related function
 ------------------------------------------------------------
 
-local function update_warp_platform_size()
-    local surface = storage.warp.current.surface
-    local new_platform_area = math2d.bounding_box.create_from_centre({0, 0}, storage.platform.warp.size - 1)
+-- v1 CORE port: per-team. Reads ctx.warp.current.surface / ctx.platform.warp.size
+-- (the flat globals are never set by the per-team path -> nil -> crash). The
+-- entity-clear filter keeps the TEAM's force (was hard-coded "player") so it
+-- does not destroy the team's own base sitting on the platform.
+local function update_warp_platform_size(force_name, ctx)
+    local surface = ctx.warp.current.surface
+    if not (surface and surface.valid) then return end
+    local size = ctx.platform.warp.size
+    local new_platform_area = math2d.bounding_box.create_from_centre({0, 0}, size - 1)
     local tiles = {}
 
     utils.add_tiles(tiles, "warp-platform", new_platform_area.left_top, new_platform_area.right_bottom)
 
-    local filter_area = math2d.bounding_box.create_from_centre({0, 0}, storage.platform.warp.size)
+    local filter_area = math2d.bounding_box.create_from_centre({0, 0}, size)
     local stuff_to_remove = surface.find_entities_filtered {
         area = filter_area,
-        force = {"player", "enemy"},
+        force = {force_name, "enemy"},
         invert = true,
     }
     for _, stuff in pairs(stuff_to_remove) do
         stuff.destroy()
     end
     surface.set_tiles(tiles)
-    if storage.platform.warp.size >= 12 then
+    if size >= 12 then
         utils.put_warning_tiles(surface, dw.hazard_tiles.surface)
     end
 end

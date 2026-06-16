@@ -145,7 +145,7 @@ local function warp_timer(force_name, ctx)
                 dw.gui.update_manual_warp_button()
 
                 -- once everything's done, force recreate the tiles in platforms (because some explosions may break some.)
-                dw.update_warp_platform_size()
+                dw.update_warp_platform_size(force_name, ctx)
                 if storage.platform.factory.surface then dw.platforms.init_update_factory_platform() end
                 if storage.harvesters.left.gate then dw.platforms.place_harvester_tiles("left") end
                 if storage.harvesters.right.gate then dw.platforms.place_harvester_tiles("right") end

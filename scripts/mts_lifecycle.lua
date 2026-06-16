@@ -110,6 +110,13 @@ local function on_team_surface_created(event)
 
     -- Paint the platform floor (no gate -- that is aux).
     lay_warp_platform_tiles(ctx, surface)
+    -- TEMP DIAG: confirm adoption fired and the tile actually took (vs being
+    -- overwritten later by the nauvis-variant clone-mirror). Remove once the
+    -- warp #0 platform is confirmed stable in-game.
+    log("[mts-dimension-warp:DIAG] warp#0 adopted: " .. force_name
+        .. " surface=" .. surface.name
+        .. " size=" .. tostring(ctx.platform.warp.size)
+        .. " tile(0,0)=" .. surface.get_tile(0, 0).name)
 end
 
 -- Mirror of warp.lua's calculate_manual_warp_time(), reading from the per-team
