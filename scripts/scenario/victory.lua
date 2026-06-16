@@ -38,6 +38,8 @@ local function on_research_finished(event)
     local ctx = dw.warp_ctx(force.name)
     ctx.victory = true
 
+    dw.diag("victory: force=%s won on warp #%d", force.name, ctx.warp.number)
+
     -- Deactivate this team's warp timers (and only this team's): -1 parks the
     -- countdowns so warp_timer never triggers another warp for them.
     ctx.timer.base = -1

@@ -9,6 +9,8 @@ local function update_warp_platform_size(force_name, ctx)
     local surface = ctx.warp.current.surface
     if not (surface and surface.valid) then return end
     local size = ctx.platform.warp.size
+    dw.diag("update_warp_platform_size force=%s surface=%s size=%s",
+        force_name, dw.diag_surface(surface), size)
     -- Ensure the platform chunks exist before tiling. At warp #0 adoption the
     -- surface is freshly created and ungenerated; without forcing generation
     -- first, the later terrain chunk-gen would overwrite the warp-platform floor.
@@ -52,11 +54,8 @@ local function teleport_platform(force_name, ctx)
     local source = ctx.warp.previous.surface
     local destination = ctx.warp.current.surface
 
-    -- TEMP DIAG: the clone requires two DISTINCT surfaces (else "source/dest
-    -- collide"). Log both so any remaining mix-up is visible. Remove once stable.
-    log("[mts-dimension-warp:DIAG] teleport_platform source="
-        .. (source and (source.name .. "#" .. source.index) or "nil") .. " dest="
-        .. (destination and (destination.name .. "#" .. destination.index) or "nil"))
+    dw.diag("teleport_platform force=%s src=%s dest=%s size=%s",
+        force_name, dw.diag_surface(source), dw.diag_surface(destination), ctx.platform.warp.size)
 
     --- if destination is nauvis, evict any players inside the platform area before cloning
     if ctx.warp.current.planet == "nauvis" then
@@ -141,7 +140,13 @@ local function teleport_platform(force_name, ctx)
                     dw.safe_teleport(player, destination, player.physical_position, true)
                 end
             else
-                if source.planet.name ~= "nauvis" then
+                -- Off-platform players are left behind on the source world and
+                -- die -- UNLESS we are leaving nauvis (the safe home base). Read
+                -- the planet from ctx (a STRING, always set) and NOT source.planet:
+                -- a nauvis warp surface (mdw-nauvis-wN) has surface.planet == nil
+                -- (create_team_surface only associates non-nauvis planets), so
+                -- source.planet.name would crash here exactly as get_allowed_planet did.
+                if ctx.warp.previous.planet ~= "nauvis" then
                     player.character.die()
                 end
             end
@@ -195,6 +200,9 @@ local function teleport_platform(force_name, ctx)
         expand_map = false,
         create_build_effect_smoke = false
     }
+
+    dw.diag("teleport_platform force=%s platform cloned src=%s -> dest=%s",
+        force_name, dw.diag_surface(source), dw.diag_surface(destination))
 
     for _, train_driver in pairs(trains_with_drivers) do
         local train = destination.find_entity(train_driver.train_name, train_driver.train_position)

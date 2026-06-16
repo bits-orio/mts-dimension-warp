@@ -23,13 +23,21 @@ local function get_allowed_planet(force_name, ctx)
     local force = game.forces[force_name]
     local allowed_planets = {}
     local total = 0
-    local current = ctx.warp.current.surface
-    local current_require_heat = current.planet.prototype.entities_require_heating
+    -- ctx.warp.current.planet is the STRING planet name (always set). The
+    -- surface's LuaPlanet (ctx.warp.current.surface.planet) is NIL for our nauvis
+    -- warp surfaces -- create_team_surface only associate_surface's NON-nauvis
+    -- planets -- so derive the current planet from the name, not surface.planet.
+    local current_planet_name = ctx.warp.current.planet
+    local current_planet = current_planet_name and game.planets[current_planet_name]
+    local current_require_heat = current_planet and current_planet.valid
+        and current_planet.prototype.entities_require_heating or false
+    dw.diag("get_allowed_planet force=%s current_planet=%s require_heat=%s",
+        force_name, tostring(current_planet_name), tostring(current_require_heat))
     for _, planet in pairs(game.planets) do
         -- remove nauvis, dimension surfaces from the list
         if not utils.ignore_planet(planet.name) then
             if force.is_space_location_unlocked(planet.name) then
-                if current_require_heat and planet.name == current.planet.name then
+                if current_require_heat and planet.name == current_planet_name then
                     goto continue
                 end
                 table.insert(allowed_planets, planet.name)
@@ -47,18 +55,26 @@ local function select_destination(force_name, ctx)
     local total_dest, destinations = get_allowed_planet(force_name, ctx)
     if ctx.warp.preferred_destination then
         if ctx.warp.preferred_destination == "nauvis" then
+            dw.diag("select_destination[%s]: preferred=nauvis -> nauvis (allowed=%d)", force_name, total_dest)
             return "nauvis"
         end
         for _, dest in pairs(destinations) do
             if dest == ctx.warp.preferred_destination then
-                return math.random() < 0.7 and dest or destinations[math.random(total_dest)]
+                local chosen = math.random() < 0.7 and dest or destinations[math.random(total_dest)]
+                dw.diag("select_destination[%s]: preferred=%s -> %s (allowed=%d)",
+                    force_name, ctx.warp.preferred_destination, chosen, total_dest)
+                return chosen
             end
         end
     end
-    return destinations[math.random(total_dest)]
+    local chosen = destinations[math.random(total_dest)]
+    dw.diag("select_destination[%s]: random -> %s (allowed=%d)", force_name, tostring(chosen), total_dest)
+    return chosen
 end
 
 local function prepare_warp_to_next_surface(force_name, ctx, target)
+    dw.diag("prepare_warp[%s]: ENTER status=%s target=%s from=%s",
+        force_name, tostring(ctx.warp.status), tostring(target), dw.diag_surface(ctx.warp.current.surface))
     if ctx.warp.status ~= defines.warp.awaiting then return end
     ctx.warp.status = defines.warp.preparing
 
@@ -66,10 +82,13 @@ local function prepare_warp_to_next_surface(force_name, ctx, target)
     -- MTS create). Only clone the platform + retire the old surface if it succeeded;
     -- on failure, drop back to awaiting so the team simply retries next expiry.
     if not dw.generate_surface(force_name, ctx, target) then
+        dw.diag("prepare_warp[%s]: generate_surface=false -> rollback to awaiting", force_name)
         ctx.warp.status = defines.warp.awaiting
         return
     end
+    dw.diag("prepare_warp[%s]: generate_surface=true -> %s", force_name, dw.diag_surface(ctx.warp.current.surface))
 
+    dw.diag("prepare_warp[%s]: status preparing -> warping", force_name)
     ctx.warp.status = defines.warp.warping
     dw.teleport_platform(force_name, ctx)
 
@@ -77,6 +96,8 @@ local function prepare_warp_to_next_surface(force_name, ctx, target)
     -- new one. CORE drives this directly (event-driven) rather than relying on a
     -- callback from the excluded aux teleport_platform -- see surface-generation.lua.
     dw.update_surfaces_properties(force_name, ctx)
+    dw.diag("prepare_warp[%s]: DONE now on %s (warp_number=%d)",
+        force_name, tostring(ctx.warp.current.name), ctx.warp.number)
 end
 
 local function reset_timer_vote(ctx)
@@ -93,7 +114,18 @@ end
 
 local function warp_timer(force_name, ctx)
     -- Skip a team MTS has paused: no warp clock, no ticking, no warp.
-    if remote.call('mts-v1', 'is_team_paused', force_name) then return end
+    if remote.call('mts-v1', 'is_team_paused', force_name) then
+        -- Only note the skip at the moment it actually matters: the warp clock has
+        -- expired and we WOULD have warped this tick were the team not paused.
+        -- Stays out of the idle path (a paused, mid-countdown team logs nothing).
+        if ctx.timer.active and ((not ctx.victory and ctx.timer.warp and ctx.timer.warp <= 0)
+            or (ctx.timer.manual_warp and ctx.timer.manual_warp <= 0)) then
+            dw.diag("warp_timer[%s]: SKIP warp -- team paused (warp=%s manual=%s votes=%d/%d)",
+                force_name, tostring(ctx.timer.warp), tostring(ctx.timer.manual_warp),
+                ctx.votes.count, ctx.votes.min_vote)
+        end
+        return
+    end
 
     if not ctx.nauvis_lab_exploded then return end
 
@@ -115,9 +147,14 @@ local function warp_timer(force_name, ctx)
         end
 
         if (not ctx.victory and ctx.timer.warp <= 0) or ctx.timer.manual_warp <= 0 then
+            local manual = ctx.timer.manual_warp <= 0
+            dw.diag("warp_timer[%s]: TRIGGER warp_number=%d warp=%d manual_warp=%d manual=%s votes=%d/%d",
+                force_name, ctx.warp.number, ctx.timer.warp, ctx.timer.manual_warp,
+                tostring(manual), ctx.votes.count, ctx.votes.min_vote)
 
             local target = select_destination(force_name, ctx)
             if target == "nauvis" and ctx.warp.current.planet == "nauvis" then
+                dw.diag("warp_timer[%s]: STAY on nauvis (target=nauvis, already on nauvis)", force_name)
                 game.print({"dw-messages.stay-on-nauvis"})
                 reset_timer_vote(ctx)
                 dw.gui.update_manual_warp_button()

@@ -116,6 +116,9 @@ local function generate_surface(force_name, ctx, target)
     local mapgen = table.deepcopy(base_mapgen)
     mapgen.seed = fairness_seed(planet, next_number)
 
+    dw.diag("generate_surface force=%s planet=%s next_number=%d seed=%d",
+        force_name, planet, next_number, mapgen.seed)
+
     -- Create the new surface FIRST, BEFORE advancing ctx.warp.current. This is
     -- critical: create_team_surface synchronously fires on_team_surface_created,
     -- and MDW's adoption handler only skips when ctx.warp.current.surface is set.
@@ -134,8 +137,12 @@ local function generate_surface(force_name, ctx, target)
         planet           = planet,
         map_gen_settings = mapgen,
     })
+    dw.diag("generate_surface force=%s create_team_surface returned %s",
+        force_name, tostring(surface_name))
     local surface = surface_name and game.surfaces[surface_name]
     if not (surface and surface.valid) then
+        dw.diag("generate_surface force=%s CREATE FAILED (planet=%s next_number=%d) -- not advancing",
+            force_name, planet, next_number)
         return false  -- create failed; nothing advanced, caller drops back to awaiting
     end
 
@@ -149,6 +156,12 @@ local function generate_surface(force_name, ctx, target)
         surface       = surface,
         surface_index = surface.index,
     }
+
+    dw.diag("generate_surface force=%s ADVANCED warp #%d -> previous=%s current=%s",
+        force_name, next_number,
+        dw.diag_surface(ctx.warp.previous and ctx.warp.previous.surface),
+        dw.diag_surface(ctx.warp.current.surface))
+
     surface.localised_name = game.planets[planet].prototype.localised_name
 
     -- Route this surface's engine events back to the owning team in O(1).
@@ -183,8 +196,15 @@ local function update_surfaces_properties(force_name, ctx)
 
     local previous = ctx.warp.previous
     if previous and previous.surface and previous.surface.valid then
+        dw.diag("update_surfaces_properties force=%s retiring previous=%s",
+            force_name, dw.diag_surface(previous.surface))
         dw.clear_surface_owner(previous.surface.index)
-        remote.call("mts-v1", "retire_team_surface", force_name, previous.name)
+        local retired = remote.call("mts-v1", "retire_team_surface", force_name, previous.name)
+        dw.diag("update_surfaces_properties force=%s retire_team_surface(%s) -> %s",
+            force_name, previous.name, tostring(retired))
+    else
+        dw.diag("update_surfaces_properties force=%s no valid previous surface to retire",
+            force_name)
     end
     ctx.warp.previous = nil
     ctx.warp.status = defines.warp.awaiting

@@ -4,6 +4,7 @@ core_util = require("__core__/lualib/util.lua")
 math2d = require("__core__/lualib/math2d")
 mod_gui = require("__core__/lualib/mod-gui")
 
+require "diag"
 require "defines"
 require "events"
 require "utils"

@@ -48,6 +48,7 @@ local function on_team_created(event)
     -- Initialize the per-team bundle. Warp #0 adoption and the timer arm on the
     -- on_team_surface_created / on_team_clock_started events below.
     dw.create_warp_ctx(force_name)
+    dw.diag("on_team_created: force=%s ctx made", force_name)
 end
 
 -- Adopt a team's FIRST surface as warp #0. MTS owns surface birth (ADR-0004);
@@ -57,10 +58,15 @@ end
 local function on_team_surface_created(event)
     local force_name, surface_name = event.force_name, event.surface_name
     if not force_name or not surface_name then return end
+    dw.diag("on_team_surface_created: force=%s surface_name=%s", force_name, tostring(surface_name))
     if not dw.has_warp_ctx(force_name) then return end -- not an MDW-tracked team
 
     local ctx = dw.warp_ctx(force_name)
-    if ctx.warp.current.surface then return end -- already adopted warp #0
+    if ctx.warp.current.surface then
+        dw.diag("on_team_surface_created: force=%s already adopted warp #0 (current=%s) -- skipping",
+            force_name, tostring(ctx.warp.current.name))
+        return -- already adopted warp #0
+    end
 
     local surface = game.surfaces[surface_name]
     if not surface or not surface.valid then return end
@@ -77,6 +83,9 @@ local function on_team_surface_created(event)
     }
     ctx.warp.number = 0
 
+    dw.diag("on_team_surface_created: force=%s ADOPT warp #0 surface=%s planet=%s platform.warp.size=%s",
+        force_name, dw.diag_surface(surface), tostring(ctx.warp.current.planet), tostring(ctx.platform.warp.size))
+
     -- Skip the disabled single-team lab intro: the team starts ON its dimension
     -- home, not on a nauvis lab that has to explode first.
     ctx.nauvis_lab_exploded = true
@@ -90,6 +99,8 @@ local function on_team_surface_created(event)
     -- overwritten by terrain gen. The warp gate + platform-growth tech are still
     -- aux (deferred).
     dw.update_warp_platform_size(force_name, ctx)
+    dw.diag("on_team_surface_created: force=%s laid platform floor on %s -- tile(0,0)=%s",
+        force_name, dw.diag_surface(surface), surface.get_tile(0, 0).name)
 
     -- One-time onboarding hint to the owning team only (force.print, so other
     -- teams don't see it). Fires exactly once per team: this whole block runs
@@ -124,11 +135,14 @@ local function on_team_clock_started(event)
     ctx.timer.active = true
     ctx.timer.warp = ctx.timer.base
     ctx.timer.manual_warp = calculate_manual_warp_time(ctx)
+    dw.diag("on_team_clock_started: force=%s armed timer.warp=%ss manual_warp=%ss",
+        force_name, tostring(ctx.timer.warp), tostring(ctx.timer.manual_warp))
 end
 
 local function on_team_released(event)
     local force_name = event.force_name
     if not force_name then return end
+    dw.diag("on_team_released: force=%s tearing down warp ctx", force_name)
     -- Drop the bundle and forget the team's surface-index mappings. MTS has
     -- already deleted the surfaces themselves.
     dw.destroy_warp_ctx(force_name)
