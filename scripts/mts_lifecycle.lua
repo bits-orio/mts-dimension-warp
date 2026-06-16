@@ -110,13 +110,16 @@ local function on_team_surface_created(event)
 
     -- Paint the platform floor (no gate -- that is aux).
     lay_warp_platform_tiles(ctx, surface)
-    -- TEMP DIAG: confirm adoption fired and the tile actually took (vs being
-    -- overwritten later by the nauvis-variant clone-mirror). Remove once the
-    -- warp #0 platform is confirmed stable in-game.
-    log("[mts-dimension-warp:DIAG] warp#0 adopted: " .. force_name
-        .. " surface=" .. surface.name
-        .. " size=" .. tostring(ctx.platform.warp.size)
-        .. " tile(0,0)=" .. surface.get_tile(0, 0).name)
+
+    -- One-time onboarding hint to the owning team only (force.print, so other
+    -- teams don't see it). Fires exactly once per team: this whole block runs
+    -- only on the warp #0 adoption, guarded above by the empty-warp.current check.
+    local force = game.forces[force_name]
+    if force and force.valid then
+        force.print("Welcome to your warp platform. Build on it -- it travels "
+            .. "with you when you warp; anything off it is left behind. "
+            .. "Research stabilize-dimensions to win.")
+    end
 end
 
 -- Mirror of warp.lua's calculate_manual_warp_time(), reading from the per-team
