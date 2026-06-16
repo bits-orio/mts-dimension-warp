@@ -1,6 +1,6 @@
 
 local warp_platform_icon = {
-    {icon = "__dimension-warp__/graphics/icons/technologies/dimension-warp-512.png", tint = util.color('#aaaaaa77'), icon_size = 512},
+    {icon = "__mts-dimension-warp__/graphics/icons/technologies/dimension-warp-512.png", tint = util.color('#aaaaaa77'), icon_size = 512},
     {icon = "__base__/graphics/technology/concrete.png", tint = util.color(defines.hexcolor.slategray.. 'ff'), icon_size=256, scale = 0.4, shift = {20, 20}, floating = true},
     {
         icon = "__core__/graphics/icons/technology/constants/constant-recipe-productivity.png",

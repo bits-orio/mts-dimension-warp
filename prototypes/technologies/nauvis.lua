@@ -4,7 +4,7 @@ data:extend({
     name = "stabilize-dimensions",
     icons = {
       {
-        icon = "__dimension-warp__/graphics/icons/technologies/dimension-warp-512.png",
+        icon = "__mts-dimension-warp__/graphics/icons/technologies/dimension-warp-512.png",
         icon_size = 512,
         tint = util.color('#aaaaaa77'),
       },

@@ -24,7 +24,7 @@ dw.loaders_generate_structure = function(tint)
             sheets = {
                 -- Base
                 {
-                    filename = "__dimension-warp__/graphics/entities/miniloader/miniloader-structure-base.png",
+                    filename = "__mts-dimension-warp__/graphics/entities/miniloader/miniloader-structure-base.png",
                     height = 192,
                     priority = 'extra-high',
                     scale = 0.5,
@@ -33,7 +33,7 @@ dw.loaders_generate_structure = function(tint)
                 },
                 -- Mask
                 {
-                    filename = "__dimension-warp__/graphics/entities/miniloader/miniloader-structure-mask.png",
+                    filename = "__mts-dimension-warp__/graphics/entities/miniloader/miniloader-structure-mask.png",
                     height = 192,
                     priority = 'extra-high',
                     scale = 0.5,
@@ -43,7 +43,7 @@ dw.loaders_generate_structure = function(tint)
                 },
                 -- Shadow
                 {
-                    filename = "__dimension-warp__/graphics/entities/miniloader/miniloader-structure-shadow.png",
+                    filename = "__mts-dimension-warp__/graphics/entities/miniloader/miniloader-structure-shadow.png",
                     draw_as_shadow = true,
                     height = 192,
                     priority = 'extra-high',
@@ -57,7 +57,7 @@ dw.loaders_generate_structure = function(tint)
             sheets = {
                 -- Base
                 {
-                    filename = "__dimension-warp__/graphics/entities/miniloader/miniloader-structure-base.png",
+                    filename = "__mts-dimension-warp__/graphics/entities/miniloader/miniloader-structure-base.png",
                     height = 192,
                     priority = 'extra-high',
                     scale = 0.5,
@@ -66,7 +66,7 @@ dw.loaders_generate_structure = function(tint)
                 },
                 -- Mask
                 {
-                    filename = "__dimension-warp__/graphics/entities/miniloader/miniloader-structure-mask.png",
+                    filename = "__mts-dimension-warp__/graphics/entities/miniloader/miniloader-structure-mask.png",
                     height = 192,
                     priority = 'extra-high',
                     scale = 0.5,
@@ -76,7 +76,7 @@ dw.loaders_generate_structure = function(tint)
                 },
                 -- Shadow
                 {
-                    filename = "__dimension-warp__/graphics/entities/miniloader/miniloader-structure-shadow.png",
+                    filename = "__mts-dimension-warp__/graphics/entities/miniloader/miniloader-structure-shadow.png",
                     height = 192,
                     priority = 'extra-high',
                     scale = 0.5,
@@ -88,7 +88,7 @@ dw.loaders_generate_structure = function(tint)
         },
         back_patch = {
             sheet = {
-                filename = "__dimension-warp__/graphics/entities/miniloader/miniloader-structure-back-patch.png",
+                filename = "__mts-dimension-warp__/graphics/entities/miniloader/miniloader-structure-back-patch.png",
                 priority = 'extra-high',
                 width = 192,
                 height = 192,
@@ -97,7 +97,7 @@ dw.loaders_generate_structure = function(tint)
         },
         front_patch = {
             sheet = {
-                filename = "__dimension-warp__/graphics/entities/miniloader/miniloader-structure-front-patch.png",
+                filename = "__mts-dimension-warp__/graphics/entities/miniloader/miniloader-structure-front-patch.png",
                 priority = 'extra-high',
                 width = 192,
                 height = 192,
@@ -151,11 +151,11 @@ dw.create_loader = function (loader_name, params)
         -- EntityPrototype
         icons = {
             {
-                icon = "__dimension-warp__/graphics/icons/miniloader/icon-base.png",
+                icon = "__mts-dimension-warp__/graphics/icons/miniloader/icon-base.png",
                 icon_size = 64,
             },
             {
-                icon = "__dimension-warp__/graphics/icons/miniloader/icon-mask.png",
+                icon = "__mts-dimension-warp__/graphics/icons/miniloader/icon-mask.png",
                 icon_size = 64,
                 tint = params.tint,
             },
@@ -214,11 +214,11 @@ dw.create_loader = function (loader_name, params)
         weight = 1000 / params.stack_size * kg,
         icons = {
             {
-                icon = "__dimension-warp__/graphics/icons/miniloader/icon-base.png",
+                icon = "__mts-dimension-warp__/graphics/icons/miniloader/icon-base.png",
                 icon_size = 64,
             },
             {
-                icon = "__dimension-warp__/graphics/icons/miniloader/icon-mask.png",
+                icon = "__mts-dimension-warp__/graphics/icons/miniloader/icon-mask.png",
                 icon_size = 64,
                 tint = params.tint,
             },

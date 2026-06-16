@@ -17,7 +17,7 @@ base.graphics_set = {
                 layers = {
                     -- Base
                     {
-                        filename = "__dimension-warp__/graphics/entities/factory-beacon/beacon-base.png",
+                        filename = "__mts-dimension-warp__/graphics/entities/factory-beacon/beacon-base.png",
                         width = 232,
                         height = 186,
                         shift = util.by_pixel(11*(4/3), 1.5*(4/3)),
@@ -25,7 +25,7 @@ base.graphics_set = {
                     },
                     -- Shadow
                     {
-                        filename = "__dimension-warp__/graphics/entities/factory-beacon/hr-beacon-base-shadow.png",
+                        filename = "__mts-dimension-warp__/graphics/entities/factory-beacon/hr-beacon-base-shadow.png",
                         width = 232,
                         height = 186,
                         shift = util.by_pixel(11*(4/3), 1.5*(4/3)),
@@ -43,7 +43,7 @@ base.graphics_set = {
                 layers = {
                     -- Base
                     {
-                        filename = "__dimension-warp__/graphics/entities/factory-beacon/hr-beacon-antenna-blue.png",
+                        filename = "__mts-dimension-warp__/graphics/entities/factory-beacon/hr-beacon-antenna-blue.png",
                         width = 108,
                         height = 100,
                         line_length = 8,
@@ -54,7 +54,7 @@ base.graphics_set = {
                     },
                     -- Shadow
                     {
-                        filename = "__dimension-warp__/graphics/entities/factory-beacon/hr-beacon-antenna-shadow.png",
+                        filename = "__mts-dimension-warp__/graphics/entities/factory-beacon/hr-beacon-antenna-shadow.png",
                         width = 126,
                         height = 98,
                         line_length = 8,
@@ -71,7 +71,7 @@ base.graphics_set = {
 }
 base.water_reflection = {
     pictures = {
-        filename = "__dimension-warp__/graphics/entities/factory-beacon/beacon-reflection.png",
+        filename = "__mts-dimension-warp__/graphics/entities/factory-beacon/beacon-reflection.png",
         priority = "extra-high",
         width = 24,
         height = 28,
@@ -97,7 +97,7 @@ base.graphics_set.module_visualisations = {
                     render_layer = "lower-object",
                     pictures =
                     {
-                        filename = "__dimension-warp__/graphics/entities/factory-beacon/blank.png",
+                        filename = "__mts-dimension-warp__/graphics/entities/factory-beacon/blank.png",
                         line_length = 4,
                         width = 50,
                         height = 66,
@@ -111,7 +111,7 @@ base.graphics_set.module_visualisations = {
                     render_layer = "lower-object",
                     pictures =
                     {
-                        filename = "__dimension-warp__/graphics/entities/factory-beacon/blank.png",
+                        filename = "__mts-dimension-warp__/graphics/entities/factory-beacon/blank.png",
                         line_length = 3,
                         width = 36,
                         height = 32,
@@ -125,7 +125,7 @@ base.graphics_set.module_visualisations = {
                     render_layer = "lower-object-above-shadow",
                     pictures =
                     {
-                        filename = "__dimension-warp__/graphics/entities/factory-beacon/blank.png",
+                        filename = "__mts-dimension-warp__/graphics/entities/factory-beacon/blank.png",
                         line_length = 3,
                         width = 26,
                         height = 12,
@@ -140,7 +140,7 @@ base.graphics_set.module_visualisations = {
                     draw_as_sprite = false,
                     pictures =
                     {
-                        filename = "__dimension-warp__/graphics/entities/factory-beacon/blank.png",
+                        filename = "__mts-dimension-warp__/graphics/entities/factory-beacon/blank.png",
                         line_length = 3,
                         width = 56,
                         height = 42,
@@ -157,7 +157,7 @@ base.graphics_set.module_visualisations = {
                     render_layer = "lower-object",
                     pictures =
                     {
-                        filename = "__dimension-warp__/graphics/entities/factory-beacon/blank.png",
+                        filename = "__mts-dimension-warp__/graphics/entities/factory-beacon/blank.png",
                         line_length = 4,
                         width = 50,
                         height = 66,
@@ -171,7 +171,7 @@ base.graphics_set.module_visualisations = {
                     render_layer = "lower-object",
                     pictures =
                     {
-                        filename = "__dimension-warp__/graphics/entities/factory-beacon/blank.png",
+                        filename = "__mts-dimension-warp__/graphics/entities/factory-beacon/blank.png",
                         line_length = 3,
                         width = 36,
                         height = 32,
@@ -185,7 +185,7 @@ base.graphics_set.module_visualisations = {
                     render_layer = "lower-object-above-shadow",
                     pictures =
                     {
-                        filename = "__dimension-warp__/graphics/entities/factory-beacon/blank.png",
+                        filename = "__mts-dimension-warp__/graphics/entities/factory-beacon/blank.png",
                         line_length = 3,
                         width = 26,
                         height = 12,
@@ -200,7 +200,7 @@ base.graphics_set.module_visualisations = {
                     draw_as_sprite = false,
                     pictures =
                     {
-                        filename = "__dimension-warp__/graphics/entities/factory-beacon/blank.png",
+                        filename = "__mts-dimension-warp__/graphics/entities/factory-beacon/blank.png",
                         line_length = 3,
                         width = 56,
                         height = 42,

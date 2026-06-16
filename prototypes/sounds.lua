@@ -3,13 +3,13 @@ data:extend{
         type = "sound",
         name = "dw-warpdrive",
         category = "alert",
-        filename = "__dimension-warp__/sound/warpdrive.ogg"
+        filename = "__mts-dimension-warp__/sound/warpdrive.ogg"
     },
     {
         type = "sound",
         name = "dw-teleport",
         category = "alert",
-        filename = "__dimension-warp__/sound/teleport.ogg",
+        filename = "__mts-dimension-warp__/sound/teleport.ogg",
         volume = 2.0
     },
     {

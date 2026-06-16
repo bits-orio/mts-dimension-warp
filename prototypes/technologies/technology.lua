@@ -2,7 +2,7 @@ local tech_neonauvis = {
     type = "technology",
     name = "neo-nauvis",
     icons = {
-        {icon = "__dimension-warp__/graphics/icons/technologies/dimension-warp-512.png", icon_size = 512},
+        {icon = "__mts-dimension-warp__/graphics/icons/technologies/dimension-warp-512.png", icon_size = 512},
     },
     visible_when_disabled = false,
     research_trigger = { type = "build-entity", entity = "warp-gate" },

@@ -1,5 +1,5 @@
 local harvester_right_icon = {
-    {icon = "__dimension-warp__/graphics/icons/technologies/dimension-warp-512.png", tint = util.color('#aaaaaa77'), icon_size = 512},
+    {icon = "__mts-dimension-warp__/graphics/icons/technologies/dimension-warp-512.png", tint = util.color('#aaaaaa77'), icon_size = 512},
     {icon = "__base__/graphics/technology/electric-mining-drill.png", tint = util.color(defines.hexcolor.orange.. 'ff'), icon_size=256, scale = 0.3, shift = {25, 25}, floating = true},
     {
         icon = "__core__/graphics/icons/technology/constants/constant-recipe-productivity.png",
@@ -10,7 +10,7 @@ local harvester_right_icon = {
     }
 }
 local harvester_left_icon = {
-    {icon = "__dimension-warp__/graphics/icons/technologies/dimension-warp-512.png", tint = util.color('#aaaaaa77'), icon_size = 512},
+    {icon = "__mts-dimension-warp__/graphics/icons/technologies/dimension-warp-512.png", tint = util.color('#aaaaaa77'), icon_size = 512},
     {icon = "__base__/graphics/technology/electric-mining-drill.png", tint = util.color(defines.hexcolor.orange.. 'ff'), icon_size=256, scale = 0.3, shift = {-25, 25}, floating = true},
     {
         icon = "__core__/graphics/icons/technology/constants/constant-recipe-productivity.png",

@@ -4,7 +4,7 @@ data:extend({
         name = "radio-station",
 
         collision_mask = {layers={object=true, item=true, meltable=true, water_tile=true, is_lower_object=true, is_object=true, player=true}},
-        icon = "__dimension-warp__/graphics/entities/radio-station/radio-station-icon.png",
+        icon = "__mts-dimension-warp__/graphics/entities/radio-station/radio-station-icon.png",
         icon_size = 64,
         flags = {"placeable-player", "player-creation"},
         minable = nil,
@@ -48,7 +48,7 @@ data:extend({
         pictures = {
             layers = {
                 {
-                    filename = "__dimension-warp__/graphics/entities/radio-station/radio-station-hr-shadow.png",
+                    filename = "__mts-dimension-warp__/graphics/entities/radio-station/radio-station-hr-shadow.png",
                     priority = "low",
                     width = 400,
                     height = 350,
@@ -60,7 +60,7 @@ data:extend({
                     draw_as_shadow = true,
                 },
                 {
-                    filename = "__dimension-warp__/graphics/entities/radio-station/radio-station-hr-animation-1.png",
+                    filename = "__mts-dimension-warp__/graphics/entities/radio-station/radio-station-hr-animation-1.png",
                     priority = "low",
                     width = 160,
                     height = 290,
@@ -71,7 +71,7 @@ data:extend({
                     shift = {0, -1},
                 },
                 {
-                    filename = "__dimension-warp__/graphics/entities/radio-station/radio-station-hr-emission-1.png",
+                    filename = "__mts-dimension-warp__/graphics/entities/radio-station/radio-station-hr-emission-1.png",
                     priority = "low",
                     width = 160,
                     height = 290,
