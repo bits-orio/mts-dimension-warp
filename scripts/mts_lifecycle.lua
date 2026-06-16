@@ -28,34 +28,10 @@ dw = dw or {}
 
 local mts_lifecycle = {}
 
-------------------------------------------------------------
---- Adoption helpers (warp #0 bootstrap)
-------------------------------------------------------------
--- Lay the dimension-space platform tiles onto the adopted home surface.
---
--- v1 CORE port: this only paints the floor. The warp GATE, harvesters, stairs
--- and the rest of the platform furniture are aux subsystems (scripts/platforms/*,
--- scripts/entities/*) and are NOT placed here.
---
--- The platform SIZE is read from ctx.platform.warp.size as a fixed value.
--- DIVERGENCE from upstream: the size-growing tech (update_warp_platform_size)
--- lives in excluded aux code, so the platform never grows in v1 -- it stays at
--- the default first-tier size the context was seeded with.
---
--- Tile shape mirrors the upstream dimension-space fill in
--- scripts/surface-generation.lua (nested floor..ceil loop -> set_tiles).
-local function lay_warp_platform_tiles(ctx, surface)
-    local size = ctx.platform.warp.size
-    local area = math2d.bounding_box.create_from_centre({0, 0}, size, size)
-
-    local tiles = {}
-    for x = math.floor(area.left_top.x), math.ceil(area.right_bottom.x) - 1 do
-        for y = math.floor(area.left_top.y), math.ceil(area.right_bottom.y) - 1 do
-            table.insert(tiles, {name = "dimension-space", position = {x, y}})
-        end
-    end
-    surface.set_tiles(tiles)
-end
+-- Warp #0 adoption lays the buildable warp-platform floor via
+-- dw.update_warp_platform_size (in the handler below). The warp gate,
+-- harvesters, stairs and the platform-growth tech are aux subsystems and are
+-- NOT placed in v1; the platform stays at the default first-tier size.
 
 ------------------------------------------------------------
 --- Handlers
@@ -108,8 +84,12 @@ local function on_team_surface_created(event)
     -- Route this surface's engine events back to the owning team in O(1).
     dw.set_surface_owner(surface.index, force_name)
 
-    -- Paint the platform floor (no gate -- that is aux).
-    lay_warp_platform_tiles(ctx, surface)
+    -- Lay the buildable warp-platform floor -- the SAME tiles a real warp lays
+    -- (update_warp_platform_size), NOT "dimension-space" (which is void, nothing
+    -- to build on). It force-generates the chunks first so the floor isn't
+    -- overwritten by terrain gen. The warp gate + platform-growth tech are still
+    -- aux (deferred).
+    dw.update_warp_platform_size(force_name, ctx)
 
     -- One-time onboarding hint to the owning team only (force.print, so other
     -- teams don't see it). Fires exactly once per team: this whole block runs

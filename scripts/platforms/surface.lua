@@ -9,6 +9,11 @@ local function update_warp_platform_size(force_name, ctx)
     local surface = ctx.warp.current.surface
     if not (surface and surface.valid) then return end
     local size = ctx.platform.warp.size
+    -- Ensure the platform chunks exist before tiling. At warp #0 adoption the
+    -- surface is freshly created and ungenerated; without forcing generation
+    -- first, the later terrain chunk-gen would overwrite the warp-platform floor.
+    surface.request_to_generate_chunks({0, 0}, size / 32 + 1)
+    surface.force_generate_chunk_requests()
     local new_platform_area = math2d.bounding_box.create_from_centre({0, 0}, size - 1)
     local tiles = {}
 
