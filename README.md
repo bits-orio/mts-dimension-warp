@@ -1,106 +1,65 @@
-# Dimension Warp
+# MTS Dimension Warp
 
-Survive on a platform warping between alternate dimensions of places you know, defend against the locals and escape!
+Per-team Dimension Warp for Multi-Team Support. Every team builds on a platform that warps between dimensions on its own clock, racing to stabilize them — same start, different finish.
 
-## Disclaimer
+> **Status:** early development. The per-team foundation is being built on top of Dimension Warp's mechanics.
 
-While I know this mods look a lot the original warptorio(s), this one is also different in the fact it is not a update of them.
+## Built on Dimension Warp — by Anakhon
 
-This mod was written from scratch, as I wanted to learn how to make mods (and at the end, I had fun making it). This also explains why it's not using the same name.
+MTS Dimension Warp is a fork of **[Dimension Warp](https://github.com/Kyria/dimension-warp), created by Anakhon (Guillaume).**
 
-## Features / Changes
+Everything that makes the warp *feel* the way it does — the platform that carries your whole base between worlds, the dimension techs, the harvesters, the art and sound, the relentless pace of Gleba — is Anakhon's work, written from scratch. This fork does exactly one thing on top of that: it makes the experience **per-team**, so it can be played as a fair race on [Multi-Team Support](https://github.com/bits-orio/multi-team-support).
 
-* Works **with or without** Space Age.
-* The timer doesn't start immediatly but after some automation science pack have been crafted (red potions).
-* **Energy between surfaces** are linked using built-in engine feature, so you can see your consumption from everywhere correctly.
-* **Dimensions techs** have been added to provide a bit of **QoL** (damage, drone speed, ...)
-* **Harvesters platforms** and the ability to put miners while not deployed
-* **Enemies** have been added to almost **all surfaces** (except Aquilo) and pollution spread everywhere.
-* **All planets have variations** that are randommly selected when warping.
-* **Loaders are included** in the mod to be used, and support item stacking [space-age only]
-* **Items stacks and spoilage have been reworked**. This can be turned off in the settings for a vanilla experience of this.
-* **Space related stuff** (rocket cost, foundation, space buildings) are **more expensive**.
-* **Dimension agricultural tower** [space-age only]: a new type of agricultural tower, that draws energy from base and teleport seeds / fruits automatically from / to base.
-* Gleba is hard. I mean it.
+The game underneath this belongs to Anakhon. If you enjoy it, go play the **[original Dimension Warp](https://github.com/Kyria/dimension-warp)** — and for the full detail of the warp gameplay (compatibilities, Rampant tuning, the dimension techs, planet behaviour), the [original README](https://github.com/Kyria/dimension-warp) is the source of truth, and all of it applies here.
 
-## Compatibilities
+## What this fork changes
 
-* Vanilla or Space Age.
-* Krastorio2 / Krastorio2 Spaced-Out
-* AAI Industry / Loaders / Containers
-* Any planet mod may work, but you'll just end with the normal version each time.
-* Enemies mods:
-    * [Cold Biters](https://mods.factorio.com/mod/Cold_biters)
-    * [Armoured Biters](https://mods.factorio.com/mod/ArmouredBiters)
-    * [Explosive Biters](https://mods.factorio.com/mod/Explosive_biters)
-    * [Toxic Biters](https://mods.factorio.com/mod/Toxic_biters)
-    * [Fulgoran Enemies (Electric Flying Enemies)](https://mods.factorio.com/mod/Electric_flying_enemies)
-* [RampantFixed](https://mods.factorio.com/mod/RampantFixed) + [Rampant Arsenal](https://mods.factorio.com/mod/RampantArsenalFork?from=search)
+Where Dimension Warp runs one shared warp for everyone, MTS Dimension Warp gives **each team its own**:
 
-## Rampant Fixed recommendation
+- **Its own warp world, on its own clock** — teams warp independently, never in lockstep.
+- **Fair by determinism** — two teams that reach the same planet at the same warp number get the *identical* world, so no team wins or loses on the luck of the draw. A host setting restores full randomization.
+- **A finish line** — research `stabilize-dimensions` to win. It's a ranked, **non-terminal** race: the first team to finish doesn't end anyone else's game.
+- **Offline safety** — a team whose timer runs out while everyone's offline is parked safely in a docking bay, not dropped into a hostile new world undefended.
 
-If you are going for Rampant, in the beginning you are requested to set *Planet processing settings*.
+It **requires** Multi-Team Support and integrates with it only through the public `mts-v1` API.
 
-Good example value can be the following: 
+## Requirements
 
-![Rampant Settings](graphics/misc/rampant_settings.png)
+- **[Multi-Team Support](https://github.com/bits-orio/multi-team-support)** — required.
+- Works **with or without** Space Age (some flavour, like the frozen docking-bay visual, is Space-Age-only).
 
-This settings make sure you are not attacked until 5min have passed and at least 5% evolution per planet. You can adjust the value to your taste, just keep in mind higher value may lead to Rampant doing not so much. 
-Make sure to enable "Other" surface and "Aquilo" as well. 
+## Lineage
 
-Other mod values are fixed by Dimension Warp (to ensure some rampant behavior) or are left to your taste.
+This mod stands on a chain of work, with gratitude to every link:
 
-## Mod Recommandations
+1. **[Warptorio](https://mods.factorio.com/mod/warptorio)** by [Nonoce](https://mods.factorio.com/user/NONOCE) — the original warping-platform idea.
+2. **[Warptorio2](https://mods.factorio.com/mod/warptorio2)** by [PyroFire](https://mods.factorio.com/user/PyroFire) — which expanded and refined it.
+3. **[Dimension Warp](https://github.com/Kyria/dimension-warp)** by Anakhon — a from-scratch take for Factorio 2.0 / Space Age, and the direct basis for this fork.
+4. **MTS Dimension Warp** — this per-team adaptation for Multi-Team Support.
 
-Some mods that may help you during your run:
+## License
 
-### Make things easier: 
+MTS Dimension Warp is licensed under the **GPLv3** — see [LICENSE](LICENSE).
 
-* Early drones mods (included in the mod or from other mods like Tiny Start 2)
-* RPG System
-* Efficient Robot + Faster Robot
+It is a derivative work of Dimension Warp, which is **BSD 3-Clause** © 2025 Guillaume ("Anakhon"). The original BSD license is retained verbatim in [LICENSE.dimension-warp](LICENSE.dimension-warp), and the provenance is recorded in [NOTICE](NOTICE). Per the BSD license's third clause, the names "Dimension Warp", "Guillaume", and "Anakhon" are not used to endorse or promote this fork.
 
-### Others 
+## Credits & thanks
 
-* K2 Fluid Storage 
-* AAI Industry + Krastorio2 if you like increased complexity
-
-## Q&A
-
-**Why do some mod techs have high costs (surface size, warp timer)?**<br>
-*The goal is to make player chose between mandatory tech to progress, and expensive/long tech to ease the game*
-
-**Only 2 harvesters ?!**<br>
-*This is really enough, and easy enough. I won't add any more.
-
-**Why is feature XXXX from warptorio not here**<br>
-*When I decided to make this mod, I only wanted features I liked / felt useful. I'm open to suggestion, but it doesn't mean I will add anything*
-
-**Why didn't you update warptorio instead**<br>
-*While the people involved in Warptorio did a great job, the code of the mod felt overwhelming. Also, I wanted to do it from scratch to understand how mods work, not just "fixing stuff"*
-
-## Known issues
-
-[Repair Turret](https://mods.factorio.com/mod/Repair_Turret) crash the game if you put them in Harvesters, when you recall harvesters with deconstruction planner. Otherwise, the usage of this mod is fine.
-
-## Credits / Thanks
+The contributions below come from Dimension Warp and remain the work of these people — their art, code, and sounds live on in this fork.
 
 ### People and mods
-
-* [Hurricane046](https://mods.factorio.com/user/Hurricane046) - for the Radio Station design.
-* [hgschmie](https://mods.factorio.com/user/hgschmie) / [miniloader-redux](https://mods.factorio.com/mod/miniloader-redux) - Use of the loader graphics and some part of the code to include them directly here.
-* [wretlaw120](https://mods.factorio.com/user/wretlaw120) / [Beacon Rebalance](https://mods.factorio.com/mod/wret-beacon-rebalance-mod) - Usage of one of the beacon graphics for the factory beacon.
-* [Quezler](https://mods.factorio.com/user/Quezler) / [Warptorio2 - warp harvester indoor drill placement](https://mods.factorio.com/mod/warptorio2-warp-harvester-indoor-drill-placement) - For making the mod that gave me the solution for placing drills in harvesters when not deployed.
-* [Nonoce](https://mods.factorio.com/user/NONOCE) / [Warptorio](https://mods.factorio.com/mod/warptorio) - For the original mod
-* [PyroFire](https://mods.factorio.com/user/PyroFire) / [Warptorio2](https://mods.factorio.com/mod/warptorio2) - For expanding and making better this first version.
+* [Hurricane046](https://mods.factorio.com/user/Hurricane046) — Radio Station design.
+* [hgschmie](https://mods.factorio.com/user/hgschmie) / [miniloader-redux](https://mods.factorio.com/mod/miniloader-redux) — loader graphics and part of the loader code.
+* [wretlaw120](https://mods.factorio.com/user/wretlaw120) / [Beacon Rebalance](https://mods.factorio.com/mod/wret-beacon-rebalance-mod) — a beacon graphic used for the factory beacon.
+* [Quezler](https://mods.factorio.com/user/Quezler) / [Warptorio2 — warp harvester indoor drill placement](https://mods.factorio.com/mod/warptorio2-warp-harvester-indoor-drill-placement) — the solution for placing drills in harvesters when not deployed.
+* [Nonoce](https://mods.factorio.com/user/NONOCE) / [Warptorio](https://mods.factorio.com/mod/warptorio) — the original mod.
+* [PyroFire](https://mods.factorio.com/user/PyroFire) / [Warptorio2](https://mods.factorio.com/mod/warptorio2) — expanding and improving that first version.
 
 ### Translations
-
 * Russian: [Shadow_Man](https://mods.factorio.com/user/Shadow_Man)
 
-### Others
-
-* [01526 swoosh 2.wav by Robinhood76](https://freesound.org/s/92909/) - License: Attribution NonCommercial 4.0 (warpdrive sound)
-* [Woosh Noise 1.wav by potentjello](https://freesound.org/s/194081/) - License: Creative Commons 0 (teleport sound)
-* [Space icons created by smalllikeart - Flaticon](https://www.flaticon.com/free-icons/space) - Blackhole icon toggle
-* [Supply icons created by Freepik - Flaticon](https://www.flaticon.com/free-icons/supply) - Supplies icon
+### Assets
+* [01526 swoosh 2.wav by Robinhood76](https://freesound.org/s/92909/) — License: Attribution NonCommercial 4.0 (warpdrive sound).
+* [Woosh Noise 1.wav by potentjello](https://freesound.org/s/194081/) — License: Creative Commons 0 (teleport sound).
+* [Space icons created by smalllikeart — Flaticon](https://www.flaticon.com/free-icons/space) — blackhole icon toggle.
+* [Supply icons created by Freepik — Flaticon](https://www.flaticon.com/free-icons/supply) — supplies icon.

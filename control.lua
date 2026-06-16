@@ -1,6 +1,32 @@
 require "lib.lib"
 require "lib.rampant"
 
+require "scripts.warp_ctx"
+local mts_lifecycle = require "scripts.mts_lifecycle"
+
+------------------------------------------------------------
+--- Per-team storage + MTS lifecycle
+------------------------------------------------------------
+-- Initialize the per-team keystone (storage.teams + surface-index reverse map)
+-- and wire MTS team birth/release to per-team context create/teardown.
+--
+-- FRESH SAVE -- no migration. The legacy flat globals below (set_globals) are
+-- left untouched for now: the singleton consumers still read them, and the
+-- mechanical port onto warp_ctx(force_name) is a later phase.
+
+-- on_init / on_configuration_changed: ensure storage shape, then setup() which
+-- remote.calls + caches the mts-v1 event ids and registers the handlers.
+local function init_mts_lifecycle()
+    dw.init_warp_ctx_storage()
+    mts_lifecycle.setup()
+end
+dw.register_event('on_init', init_mts_lifecycle)
+dw.register_event('on_configuration_changed', init_mts_lifecycle)
+
+-- on_load: NO remote.call / NO storage writes -- just re-attach handlers from
+-- the event ids cached in storage during on_init/on_configuration_changed.
+dw.register_event('on_load', mts_lifecycle.register)
+
 ------------------------------------------------------------
 --- Globals
 ------------------------------------------------------------
