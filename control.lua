@@ -23,6 +23,12 @@ end
 dw.register_event('on_init', init_mts_lifecycle)
 dw.register_event('on_configuration_changed', init_mts_lifecycle)
 
+-- Upgrade-only fixup: re-derive each existing team's warp-timer gate from its
+-- actual warp-generator-1 research state (the gate was restored after an earlier
+-- version armed the timer unconditionally at clock-start). on_init has no teams,
+-- so it only matters on on_configuration_changed.
+dw.register_event('on_configuration_changed', dw.regate_existing_teams)
+
 -- on_load: NO remote.call / NO storage writes -- just re-attach handlers from
 -- the event ids cached in storage during on_init/on_configuration_changed.
 dw.register_event('on_load', mts_lifecycle.register)

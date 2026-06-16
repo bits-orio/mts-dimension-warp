@@ -237,4 +237,31 @@ function dw.init_warp_ctx_storage()
     storage.surface_index_to_force = storage.surface_index_to_force or {}
 end
 
+-- Migration (on_configuration_changed): the warp-generator-1 research gate was
+-- restored after an earlier version armed ctx.timer.active immediately at MTS
+-- clock-start. Recompute each existing team's gate from its ACTUAL research
+-- state, so an upgraded in-flight save obeys the new rule: a team is armed iff
+-- it has researched warp-generator-1. Idempotent (recomputes from research, not
+-- from the prior flag), so it is safe to run on any config change. A fresh save
+-- has no teams, so this is a no-op there.
+function dw.regate_existing_teams()
+    if not storage.teams then return end
+    for force_name, ctx in pairs(storage.teams) do
+        local force = game.forces[force_name]
+        local gen1 = force and force.valid and force.technologies["warp-generator-1"]
+        if gen1 and gen1.researched then
+            ctx.timer.active = true
+            -- Backfill the countdown when arming so the live warp loop
+            -- (warp.lua `if ctx.timer.warp >= 0`) and the GUI never compare nil.
+            -- A staged-start (skip_clock) team can still have warp==nil here --
+            -- on_team_clock_started hasn't fired -- so mirror the gen-1 research
+            -- handler's self-heal rather than trust clock-start ordering.
+            ctx.timer.warp = ctx.timer.warp or ctx.timer.base
+            ctx.timer.manual_warp = ctx.timer.manual_warp or ctx.timer.base
+        else
+            ctx.timer.active = false
+        end
+    end
+end
+
 return warp_ctx_lib

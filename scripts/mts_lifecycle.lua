@@ -123,19 +123,23 @@ local function calculate_manual_warp_time(ctx)
     return math.min(max_time, math.floor(base_time + warp_zone ^ 1.35))
 end
 
--- Arm the team's warp timer when MTS starts its clock. No warp is performed yet
--- (the warp loop is a later slice); this only seeds the countdown state so the
--- loop has something to tick down once it lands.
+-- Seed the team's warp-timer SHAPE when MTS starts its clock, but leave it
+-- INACTIVE. Under the restored DW research gate, the timer only goes live when
+-- the team researches warp-generator-1 (warp.lua warp_generator_research); until
+-- then ctx.timer.active stays false, so there is no warp button and no auto-warp
+-- countdown. We still seed warp/manual_warp here so the loop and the gate have
+-- correct values to count from the instant it arms.
 local function on_team_clock_started(event)
     local force_name = event.force_name
     if not force_name then return end
     if not dw.has_warp_ctx(force_name) then return end
 
     local ctx = dw.warp_ctx(force_name)
-    ctx.timer.active = true
+    -- NOTE: ctx.timer.active is intentionally NOT armed here (it defaults false).
+    -- Researching warp-generator-1 arms it -- see scripts/warp.lua.
     ctx.timer.warp = ctx.timer.base
     ctx.timer.manual_warp = calculate_manual_warp_time(ctx)
-    dw.diag("on_team_clock_started: force=%s armed timer.warp=%ss manual_warp=%ss",
+    dw.diag("on_team_clock_started: force=%s seeded timer.warp=%ss manual_warp=%ss (INACTIVE until warp-generator-1)",
         force_name, tostring(ctx.timer.warp), tostring(ctx.timer.manual_warp))
 end
 

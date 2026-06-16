@@ -347,26 +347,33 @@ dw.platform_force_update_entities = function()
 end
 
 
+-- Per-team platform-growth gate (restores DW's warp-platform-size progression).
+-- DW grew the platform when warp-platform-size-N was researched. MTS team forces
+-- research independently, so resolve event.research.force -> that team's ctx and
+-- grow ONLY that team's platform.
 local function on_technology_research_finished(event)
     local tech = event.research
+    local force = tech.force
+    -- Only team forces have a warp ctx; ignore player/spectator/enemy/neutral.
+    if not force.name:find("^team%-") then return end
+    if not dw.has_warp_ctx(force.name) then return end
+    local ctx = dw.warp_ctx(force.name)
+
     if string.match(tech.name, "warp%-platform%-size%-%d+") then
-        storage.platform.warp.size = dw.platform_size.warp[tech.level + 1]
-        update_warp_platform_size()
+        -- Tier table dw.platform_size.warp = {8,22,36,...}; level N -> index N+1.
+        ctx.platform.warp.size = dw.platform_size.warp[tech.level + 1]
+        update_warp_platform_size(force.name, ctx)
+        dw.diag("warp-platform-size-%d researched: force=%s -> platform size=%d",
+            tech.level, force.name, ctx.platform.warp.size)
     end
 
-    if string.match(tech.name, "platform%-radar") then
-        local radio_tower = storage.warp.current.surface.find_entity(dw.entities.surface_radio_station.name, dw.entities.surface_radio_station.position)
-        if radio_tower then
-            radio_tower.active = true
-        end
-        local radar = storage.platform.factory.surface.create_entity{name="dw-hidden-radar", force="player", position={0,0}}
-        radar.destructible = false
-        local radar = storage.platform.mining.surface.create_entity{name="dw-hidden-radar", force="player", position={0,0}}
-        radar.destructible = false
-        local radar = storage.platform.power.surface.create_entity{name="dw-hidden-radar", force="player", position={0,0}}
-        radar.destructible = false
-
-    end
+    -- platform-radar: DEFERRED AUX. The factory/mining/power platforms and the
+    -- surface radio station are Phase-4 aux subsystems not yet in the per-team
+    -- model, so ctx has no .platform.{factory,mining,power}.surface to wire a
+    -- hidden radar onto. Left as an explicit no-op -- the old flat-global body
+    -- (storage.warp.current.surface / storage.platform.*.surface) would crash on
+    -- the per-team path. Re-enable when those aux platforms land.
+    -- if string.match(tech.name, "platform%-radar") then ... end
 end
 
 
