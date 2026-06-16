@@ -69,7 +69,7 @@ local function get_warp_frame(player)
     end
 
     local surfaceflow = warp_frame.surface or warp_frame.add{type = "label", name = "surface", caption = {"dw-gui.planet", "nauvis", "Nauvis", "normal"}}
-    local dimensionflow = warp_frame.dimension or warp_frame.add{type = "label", name = "dimension", caption = {"dw-gui.dimension", "0"}}
+    local dimensionflow = warp_frame.dimension or warp_frame.add{type = "label", name = "dimension", caption = {"dw-gui.dimension", "1"}}
     local surface_time = warp_frame.surface_time or warp_frame.add{type = "label", name = "surface_time", caption = {"dw-gui.planet_clock", "0"}}
     local surface_evolution = warp_frame.surface_evolution or warp_frame.add{type = "label", name = "surface_evolution", caption = {"dw-gui.planet_evolution", "0"}}
     local warpflow = warp_frame.warp_timer or warp_frame.add{type = "label", name = "warp_timer", caption = {"dw-gui.autowarp_timer", "0"}}
@@ -443,7 +443,13 @@ local function update()
         frame.destination_flow.visible = player_gui_settings.planet_selector and ctx.gui.planet_selector_enabled
 
         frame.surface.caption = {"dw-gui.planet", ctx.warp.current.planet, {"space-location-name." .. ctx.warp.current.planet}, ctx.warp.randomizer or "normal"}
-        frame.dimension.caption = {"dw-gui.dimension", ctx.warp.number}
+        -- Display the dimension as number + 1 to match original DW: DW's on_init
+        -- ran one generate_surface (bumping its stored number 0 -> 1) before the
+        -- panel showed, so its home platform read "Dimension 1". MDW adopts warp
+        -- #0 and KEEPS the stored number at 0 (it feeds the deterministic fairness
+        -- seed -- mutating it would re-roll every team's warp sequence). So the +1
+        -- is display-only: home = "Dimension 1", first warp = "Dimension 2", ...
+        frame.dimension.caption = {"dw-gui.dimension", ctx.warp.number + 1}
         frame.surface_evolution.caption = {"dw-gui.planet_evolution", string.format("%.2f", game.forces.enemy.get_evolution_factor(ctx.warp.current.surface) * 100)}
         frame.surface_time.caption = {"dw-gui.planet_clock", utils.format_time(game.tick/60 - ctx.warp.time/60)}
 
