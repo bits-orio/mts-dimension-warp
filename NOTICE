@@ -1,0 +1,18 @@
+MTS Dimension Warp
+Copyright (C) 2026 bits-orio
+Licensed under the GNU General Public License v3.0 — see LICENSE.
+
+This mod is a derivative work of:
+
+  Dimension Warp
+  Copyright (c) 2025 Guillaume ("Anakhon")
+  https://github.com/Kyria/dimension-warp
+  Licensed under the BSD 3-Clause License — see LICENSE.dimension-warp.
+
+The original BSD-3-Clause license and copyright notice for the Dimension Warp
+portions are retained in LICENSE.dimension-warp, as that license requires. We do
+not relicense Guillaume's original code away from BSD; the combined work and our
+additions are distributed under the GPLv3.
+
+Per BSD-3-Clause clause 3, the names "Dimension Warp", "Guillaume", and "Anakhon"
+are not used to endorse or promote this fork.
