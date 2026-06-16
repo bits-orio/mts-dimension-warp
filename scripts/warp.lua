@@ -139,8 +139,8 @@ local function warp_timer(force_name, ctx)
 
                 reset_timer_vote(ctx)
 
-                -- reset evolution based on warp number
-                dw.set_warp_evolution_factor()
+                -- reset evolution based on warp number (per-team surface)
+                dw.set_warp_evolution_factor(force_name, ctx)
                 ctx.pollution = 1
                 dw.gui.update_manual_warp_button()
 

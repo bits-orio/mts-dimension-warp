@@ -1,6 +1,28 @@
 --- Everything related to DW GUI is here.
 ------------------------------------------------------------
+-- v1 CORE port: the warp frame is now PER-TEAM. Every read of warp/timer/votes
+-- state (and the planet selector) is threaded through ctx -- the
+-- storage.teams[force_name] bundle from scripts/warp_ctx.lua -- so each player
+-- sees their OWN team's warp state. A player's team is their force; their ctx is
+-- dw.warp_ctx(force.name), resolved ONLY for forces whose name matches ^team%-
+-- (see ctx_for_player). Players on the spectator / landing-pen / player force get
+-- no ctx, so their warp frame is hidden and blank -- we never fabricate a bogus
+-- context for a non-team force.
+--
+-- EXPECTED stale (out of slice 5 scope): the item-watcher container frame and its
+-- helpers (get_container_frame, get_or_create_item_selector, update_watchdog,
+-- item_watch_changed, update_watchdogs_gui) still read the flat storage.gui seeds.
+-- That is an aux subsystem (fed by misc.lua, also flat) and must NOT be ported here.
 dw.gui = dw.gui or {}
+
+-- Resolve the warp context for the player's OWN team, or nil if the player is not
+-- on a team force. Guarded so we never lazily create a bogus ctx for the
+-- spectator / landing-pen / player force: only ^team%- forces get a context.
+local function ctx_for_player(player)
+    local force_name = player.force.name
+    if not force_name:find('^team%-') then return nil end
+    return dw.warp_ctx(force_name)
+end
 
 local function get_player_gui_settings(player)
     local player_settings = settings.get_player_settings(player)
@@ -38,6 +60,14 @@ local function get_warp_frame(player)
     warp_frame.visible = warp_frame.visible or false
     warp_frame.style.padding = {5, 0, 0, 5}
 
+    -- A player not on a team force has no warp state: hide the whole warp frame
+    -- and stop -- never build/refresh per-team widgets without a context.
+    local ctx = ctx_for_player(player)
+    if not ctx then
+        warp_frame.visible = false
+        return warp_frame
+    end
+
     local surfaceflow = warp_frame.surface or warp_frame.add{type = "label", name = "surface", caption = {"dw-gui.planet", "nauvis", "Nauvis", "normal"}}
     local dimensionflow = warp_frame.dimension or warp_frame.add{type = "label", name = "dimension", caption = {"dw-gui.dimension", "0"}}
     local surface_time = warp_frame.surface_time or warp_frame.add{type = "label", name = "surface_time", caption = {"dw-gui.planet_clock", "0"}}
@@ -56,38 +86,43 @@ local function get_warp_frame(player)
     destination_list.none.style.height = 25
     destination_list.none.style.padding = 0
     destination_list.none.style.margin = 0
-    storage.gui.planet_selector_list["preferred-none"] = true
-    
+    ctx.gui.planet_selector_list["preferred-none"] = true
+
     for _, planet in pairs(game.planets) do
-        if not utils.ignore_planet(planet.name) and player.force.is_space_location_unlocked(planet.name) then 
+        if not utils.ignore_planet(planet.name) and player.force.is_space_location_unlocked(planet.name) then
             destination_list["preferred-" .. planet.name] = destination_flow["preferred-" .. planet.name] or destination_flow.add{type="sprite-button", name="preferred-" .. planet.name, sprite="space-location." .. planet.name, tooltip = {"space-location-name." .. planet.name}, auto_toggle=true}
             destination_list["preferred-" .. planet.name].style.width = 25
             destination_list["preferred-" .. planet.name].style.height = 25
             destination_list["preferred-" .. planet.name].style.padding = 0
             destination_list["preferred-" .. planet.name].style.margin = 0
-            storage.gui.planet_selector_list["preferred-" .. planet.name] = true
+            ctx.gui.planet_selector_list["preferred-" .. planet.name] = true
         end
     end
 
+    -- nauvis_lab_exploded is set per-team by mts_lifecycle warp #0 adoption (the
+    -- flat storage.nauvis_lab_exploded is NEVER set -- lab_intro is disabled -- so
+    -- gating on it would keep the whole info GUI hidden forever).
     local player_gui_settings = get_player_gui_settings(player)
-    surfaceflow.visible = player_gui_settings.info_planet and (storage.nauvis_lab_exploded or false)
-    dimensionflow.visible = player_gui_settings.info_dimension and (storage.nauvis_lab_exploded or false)
-    surface_time.visible = player_gui_settings.info_planet_clock and (storage.nauvis_lab_exploded or false)
-    surface_evolution.visible = player_gui_settings.info_evolution and (storage.nauvis_lab_exploded or false)
-    warpflow.visible = player_gui_settings.info_warp_timer and storage.timer.active and not storage.victory
-    manualwarpflow.visible = player_gui_settings.info_manual_timer and storage.timer.active
-    destination_flow.visible = player_gui_settings.planet_selector and storage.gui.planet_selector_enabled
-    warp_button.visible = storage.timer.active
+    surfaceflow.visible = player_gui_settings.info_planet and (ctx.nauvis_lab_exploded or false)
+    dimensionflow.visible = player_gui_settings.info_dimension and (ctx.nauvis_lab_exploded or false)
+    surface_time.visible = player_gui_settings.info_planet_clock and (ctx.nauvis_lab_exploded or false)
+    surface_evolution.visible = player_gui_settings.info_evolution and (ctx.nauvis_lab_exploded or false)
+    warpflow.visible = player_gui_settings.info_warp_timer and ctx.timer.active and not ctx.victory
+    manualwarpflow.visible = player_gui_settings.info_manual_timer and ctx.timer.active
+    destination_flow.visible = player_gui_settings.planet_selector and ctx.gui.planet_selector_enabled
+    warp_button.visible = ctx.timer.active
 
     return warp_frame
 end
 dw.gui.get_warp_frame = get_warp_frame
 
-local function get_or_create_item_selector(player, frame, name)
+-- ctx is the player's team warp context; the watched item for this slot lives in
+-- ctx.gui.item_watch (per-team), matching the producer in misc.lua.
+local function get_or_create_item_selector(player, ctx, frame, name)
     local flow = frame[name] or frame.add({type = "flow", name = name, direction = "horizontal"})
 
     local item_button = flow.item or flow.add{type="choose-elem-button", name="item", elem_type="item-with-quality"}
-    item_button.elem_value = storage.gui.item_watch[name]
+    item_button.elem_value = ctx.gui.item_watch[name]
 
     local item_count = flow.count or flow.add{type="label", name="count", caption = "0"}
 
@@ -115,21 +150,30 @@ local function get_container_frame(player)
     container_frame.visible = container_frame.visible or false
     container_frame.style.margin = {5, 0, 0, 5}
 
+    -- A player not on a team force watches no items: hide the frame and stop, so we
+    -- never build per-team watchdog rows without a context.
+    local ctx = ctx_for_player(player)
+    if not ctx then
+        container_frame.visible = false
+        return container_frame
+    end
+
     if not container_frame.header_label then container_frame.add{type = "label", name = "header_label", caption = {"dw-gui.item-watch"}} end
     if not container_frame.header_line then container_frame.add{type = "line", name = "header_line"} end
 
     local item_table = container_frame.item_table or container_frame.add({type = "table", name = "item_table", column_count = 3})
     if not container_frame.footer_line then container_frame.add{type = "line", name = "footer_line"} end
 
-    for watchdog, _ in pairs(storage.gui.watchdogs) do
-        local item = storage.gui.item_watch['watch-item-' .. watchdog]
-        
+    -- Watchdogs + watched items are this team's (ctx.gui), populated by misc.lua.
+    for watchdog, _ in pairs(ctx.gui.watchdogs) do
+        local item = ctx.gui.item_watch['watch-item-' .. watchdog]
+
         -- if we have an item watched, but not existing (mod change) remove the watchdog
         if item and not prototypes.item[item.name] then
-            dw.gui.update_watchdog('watch-item-' .. watchdog, nil)
+            dw.gui.update_watchdog(ctx, 'watch-item-' .. watchdog, nil)
             container_frame.item_table['watch-item-' .. watchdog].destroy()
         else
-            get_or_create_item_selector(player, item_table, 'watch-item-' .. watchdog)
+            get_or_create_item_selector(player, ctx, item_table, 'watch-item-' .. watchdog)
         end
     end
 
@@ -137,22 +181,28 @@ local function get_container_frame(player)
 end
 dw.gui.get_container_frame = get_container_frame
 
+-- Single global handler: iterate connected players and refresh each one's vote
+-- button against their OWN team's ctx.votes/timer. Non-team players have no warp
+-- frame (get_warp_frame returns it hidden, without a warp_button), so skip them.
 local function update_manual_warp_button()
-    for _, player in pairs(game.players) do
+    for _, player in pairs(game.connected_players) do
+        local ctx = ctx_for_player(player)
+        if not ctx then goto continue end
+
         local frame = get_warp_frame(player)
         local button = frame.warp_button
-        button.visible = storage.timer.active
+        button.visible = ctx.timer.active
 
-        if storage.votes.count >= storage.votes.min_vote then
+        if ctx.votes.count >= ctx.votes.min_vote then
             button.caption = {"dw-gui.warp-button-warping"}
             button.enabled = false
         else
-            if storage.votes.count > 0 then
-                if storage.votes.players[player.index] then
-                    button.caption = {"dw-gui.warp-button-wait", storage.votes.count, storage.votes.min_vote}
+            if ctx.votes.count > 0 then
+                if ctx.votes.players[player.index] then
+                    button.caption = {"dw-gui.warp-button-wait", ctx.votes.count, ctx.votes.min_vote}
                     button.enabled = false
                 else
-                    button.caption = {"dw-gui.warp-button-warp", storage.votes.count, storage.votes.min_vote}
+                    button.caption = {"dw-gui.warp-button-warp", ctx.votes.count, ctx.votes.min_vote}
                     button.enabled = true
                 end
             else
@@ -160,12 +210,19 @@ local function update_manual_warp_button()
                 button.enabled = true
             end
         end
+
+        ::continue::
     end
 end
 dw.gui.update_manual_warp_button = update_manual_warp_button
 
-local function update_preferred_destination(previous_destination, current_destination)
-    for _, player in pairs(game.players) do
+-- Sync the preferred-destination toggle for every player ON THE SAME TEAM whose
+-- ctx.warp.preferred_destination just changed. Other teams' selectors are
+-- independent and must not be touched.
+local function update_preferred_destination(force_name, previous_destination, current_destination)
+    for _, player in pairs(game.connected_players) do
+        if player.force.name ~= force_name then goto continue end
+
         local frame = get_warp_frame(player)
         local previous_button = frame.destination_flow["preferred-" .. previous_destination]
         if previous_button then
@@ -175,6 +232,8 @@ local function update_preferred_destination(previous_destination, current_destin
         if current_button then
             current_button.toggled = true
         end
+
+        ::continue::
     end
 end
 
@@ -186,10 +245,16 @@ local function warp_frame_click(event)
         frame.visible = not frame.visible
     end
 
+    -- Vote / preferred-destination both mutate the CLICKING player's team ctx.
+    -- A non-team player can't have these buttons (their warp frame is hidden), so
+    -- guarding here is belt-and-suspenders against a stray click event.
     if button.name == "warp_button" then
-        storage.votes.count = storage.votes.count + 1
-        storage.votes.players[event.player_index] = true
-        update_manual_warp_button()
+        local ctx = ctx_for_player(player)
+        if ctx then
+            ctx.votes.count = ctx.votes.count + 1
+            ctx.votes.players[event.player_index] = true
+            update_manual_warp_button()
+        end
     end
 
     if button.name == "container_toggle" then
@@ -198,49 +263,54 @@ local function warp_frame_click(event)
     end
 
     if button.name:match('^preferred%-') then
-        local planet_name = button.name:sub(11)
-        local previous = storage.warp.preferred_destination or "none"
-        if button.toggled then
-            storage.warp.preferred_destination = planet_name
-        else
-            storage.warp.preferred_destination = nil
+        local ctx = ctx_for_player(player)
+        if ctx then
+            local planet_name = button.name:sub(11)
+            local previous = ctx.warp.preferred_destination or "none"
+            if button.toggled then
+                ctx.warp.preferred_destination = planet_name
+            else
+                ctx.warp.preferred_destination = nil
+            end
+            update_preferred_destination(player.force.name, previous, ctx.warp.preferred_destination or "none")
         end
-        update_preferred_destination(previous, storage.warp.preferred_destination or "none")
     end
 end
 
---- Update the item watcher list, and the watchdogs if needed.
+--- Update the item watcher list, and the watchdogs if needed. Operates on the
+--- given team's context (ctx.gui), so each team's watch list is independent.
+---@param ctx table the team's warp context (storage.teams[force_name] bundle)
 ---@param name string the watchdog item index
 ---@param item PrototypeWithQuality|nil the item to watch or nil to remove the watch
 ---@return boolean true if a watchdog has been removed, false otherwise
-local function update_watchdog(name, item)
+local function update_watchdog(ctx, name, item)
     local remove_watchdog = false
     -- add the item to the watchlist, or remove it if required
     if item then
         -- add the item to the watchlist, only increase the counter if the watcher didn't have any item yet
-        if not storage.gui.item_watch[name] then
-            storage.gui.count_watched_item = storage.gui.count_watched_item + 1
+        if not ctx.gui.item_watch[name] then
+            ctx.gui.count_watched_item = ctx.gui.count_watched_item + 1
         end
-        storage.gui.item_watch[name] = item
+        ctx.gui.item_watch[name] = item
 
         -- add a watchdog for an item
-        if storage.gui.count_watched_item == storage.gui.count_watchdogs then
-            storage.gui.count_watchdogs = storage.gui.count_watchdogs + 1
-            storage.gui.watchdogs[game.tick] = true
+        if ctx.gui.count_watched_item == ctx.gui.count_watchdogs then
+            ctx.gui.count_watchdogs = ctx.gui.count_watchdogs + 1
+            ctx.gui.watchdogs[game.tick] = true
         end
 
     else
         -- remove the watched item based on the watchdog name
-        if storage.gui.item_watch[name] then
-            storage.gui.item_watch[name] = nil
-            storage.gui.count_watched_item = storage.gui.count_watched_item - 1
+        if ctx.gui.item_watch[name] then
+            ctx.gui.item_watch[name] = nil
+            ctx.gui.count_watched_item = ctx.gui.count_watched_item - 1
 
             -- if we have more than 3 watchdogs, and more than 1 empty, remove the one we unset
-            if storage.gui.count_watchdogs > 3 and (storage.gui.count_watchdogs - storage.gui.count_watched_item) > 1  then
+            if ctx.gui.count_watchdogs > 3 and (ctx.gui.count_watchdogs - ctx.gui.count_watched_item) > 1  then
                 local watchdog = tonumber(name:match('watch%-item%-(%d+)'))
                 if watchdog then
-                    storage.gui.watchdogs[watchdog] = nil
-                    storage.gui.count_watchdogs = storage.gui.count_watchdogs - 1
+                    ctx.gui.watchdogs[watchdog] = nil
+                    ctx.gui.count_watchdogs = ctx.gui.count_watchdogs - 1
                     remove_watchdog = true
                 end
             end
@@ -251,7 +321,9 @@ local function update_watchdog(name, item)
 end
 dw.gui.update_watchdog = update_watchdog
 
----Event fired when player change an item in the item watcher
+---Event fired when player change an item in the item watcher. The watch list is
+---per-team, so the change applies to the CLICKING player's team and is mirrored to
+---every connected teammate's container frame only.
 ---@param event EventData.on_gui_elem_changed
 local function item_watch_changed(event)
     local elem = event.element
@@ -260,10 +332,18 @@ local function item_watch_changed(event)
 
     if not name or not name:match('watch%-item%-%d+') then return end
 
-    local remove_watchdog = update_watchdog(name, item)
-    
-    -- update player UI
-    for _, player in pairs(game.players) do
+    -- The watcher row only exists on a team player's container frame, so a non-team
+    -- force can't reach here -- guard anyway so a stray event can't fabricate a ctx.
+    local clicker = game.players[event.player_index]
+    local ctx = ctx_for_player(clicker)
+    if not ctx then return end
+
+    local remove_watchdog = update_watchdog(ctx, name, item)
+
+    -- update UI for every connected teammate (same team -> same watch list)
+    for _, player in pairs(game.connected_players) do
+        if player.force.name ~= clicker.force.name then goto continue end
+
         local frame = get_container_frame(player)
         frame.item_table[name].item.elem_value = item
         frame.item_table[name].count.caption = "0"
@@ -271,16 +351,23 @@ local function item_watch_changed(event)
         if not item and remove_watchdog then
             frame.item_table[name].destroy()
         end
+
+        ::continue::
     end
 end
 
---- Update the watchdogs labels to display the actual item quantity
+--- Update the watchdogs labels to display the actual item quantity. Single global
+--- handler: each connected player's labels reflect their OWN team's ctx.gui counts
+--- (item_watch + item_list, written by misc.lua). Non-team players are skipped.
 local function update_watchdogs_gui()
     for _, player in pairs(game.connected_players) do
+        local ctx = ctx_for_player(player)
+        if not ctx then goto continue end
+
         local player_gui_settings = get_player_gui_settings(player)
 
-        for watchdog, item in pairs(storage.gui.item_watch) do
-            local item_quantity = storage.gui.item_list[item.name .. '-' .. item.quality] or 0
+        for watchdog, item in pairs(ctx.gui.item_watch) do
+            local item_quantity = ctx.gui.item_list[item.name .. '-' .. item.quality] or 0
             local frameflow = mod_gui.get_frame_flow(player)
 
             if not frameflow.dw_frame or not frameflow.dw_frame.container_frame then
@@ -312,6 +399,8 @@ local function update_watchdogs_gui()
                 frame.item_table[watchdog].count.caption = utils.format_thousands(item_quantity.qty, player_gui_settings.delimiter)
             end
         end
+
+        ::continue::
     end
 end
 dw.gui.update_watchdogs_gui = update_watchdogs_gui
@@ -335,38 +424,45 @@ local function on_player_created(event)
     prepare_warp_gui(player)
 end
 
---- Update all the GUI information (except items)
+--- Update all the GUI information (except items). Single global handler: iterate
+--- connected players and refresh each one's warp frame against their OWN team's
+--- ctx. Non-team players have no ctx (and a hidden warp frame), so skip them.
 local function update()
-    for _, player in pairs(game.players) do
+    for _, player in pairs(game.connected_players) do
+        local ctx = ctx_for_player(player)
+        if not ctx then goto continue end
+
         local frame = get_warp_frame(player)
 
         local player_gui_settings = get_player_gui_settings(player)
-        
-        frame.surface.visible = player_gui_settings.info_planet and (storage.nauvis_lab_exploded or false)
-        frame.dimension.visible = player_gui_settings.info_dimension and (storage.nauvis_lab_exploded or false)
-        frame.surface_time.visible = player_gui_settings.info_planet_clock and (storage.nauvis_lab_exploded or false)
-        frame.surface_evolution.visible = player_gui_settings.info_evolution and (storage.nauvis_lab_exploded or false)
-        frame.destination_flow.visible = player_gui_settings.planet_selector and storage.gui.planet_selector_enabled
 
-        frame.surface.caption = {"dw-gui.planet", storage.warp.current.planet, {"space-location-name." .. storage.warp.current.planet}, storage.warp.randomizer or "normal"}
-        frame.dimension.caption = {"dw-gui.dimension", storage.warp.number}
-        frame.surface_evolution.caption = {"dw-gui.planet_evolution", string.format("%.2f", game.forces.enemy.get_evolution_factor(storage.warp.current.surface) * 100)}
-        frame.surface_time.caption = {"dw-gui.planet_clock", utils.format_time(game.tick/60 - storage.warp.time/60)}
+        frame.surface.visible = player_gui_settings.info_planet and (ctx.nauvis_lab_exploded or false)
+        frame.dimension.visible = player_gui_settings.info_dimension and (ctx.nauvis_lab_exploded or false)
+        frame.surface_time.visible = player_gui_settings.info_planet_clock and (ctx.nauvis_lab_exploded or false)
+        frame.surface_evolution.visible = player_gui_settings.info_evolution and (ctx.nauvis_lab_exploded or false)
+        frame.destination_flow.visible = player_gui_settings.planet_selector and ctx.gui.planet_selector_enabled
 
-        if storage.timer.active then
-            if storage.timer.warp >= 0 then
+        frame.surface.caption = {"dw-gui.planet", ctx.warp.current.planet, {"space-location-name." .. ctx.warp.current.planet}, ctx.warp.randomizer or "normal"}
+        frame.dimension.caption = {"dw-gui.dimension", ctx.warp.number}
+        frame.surface_evolution.caption = {"dw-gui.planet_evolution", string.format("%.2f", game.forces.enemy.get_evolution_factor(ctx.warp.current.surface) * 100)}
+        frame.surface_time.caption = {"dw-gui.planet_clock", utils.format_time(game.tick/60 - ctx.warp.time/60)}
+
+        if ctx.timer.active then
+            if ctx.timer.warp >= 0 then
                 frame.warp_timer.visible = player_gui_settings.info_warp_timer
-                local timer = utils.format_time(storage.timer.warp)
-                if storage.timer.warp <= 60 then timer = "[font=default-bold][color=#faf17a]" .. timer .. "[/color][/font]" end
+                local timer = utils.format_time(ctx.timer.warp)
+                if ctx.timer.warp <= 60 then timer = "[font=default-bold][color=#faf17a]" .. timer .. "[/color][/font]" end
                 frame.warp_timer.caption = {"dw-gui.autowarp_timer", timer}
             else
                 frame.warp_timer.visible = false
             end
             frame.warp_timer_manual.visible = player_gui_settings.info_manual_timer
-            local timer = utils.format_time(storage.timer.manual_warp)
-            if storage.timer.manual_warp < 10 then timer = "[font=default-bold][color=#faf17a]" .. timer .. "[/color][/font]" end
+            local timer = utils.format_time(ctx.timer.manual_warp)
+            if ctx.timer.manual_warp < 10 then timer = "[font=default-bold][color=#faf17a]" .. timer .. "[/color][/font]" end
             frame.warp_timer_manual.caption = {"dw-gui.manualwarp_timer", timer}
         end
+
+        ::continue::
     end
 end
 dw.gui.update = update

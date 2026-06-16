@@ -93,7 +93,9 @@ local function on_team_surface_created(event)
     -- surface_index}. planet is a STRING name (surface.planet is the LuaPlanet).
     ctx.warp.current = {
         name          = surface.name,
-        planet        = surface.planet and surface.planet.name or nil,
+        -- Always a non-nil string: consumers (gui space-location label, seed)
+        -- concatenate it. A non-planet home surface defaults to nauvis.
+        planet        = surface.planet and surface.planet.name or "nauvis",
         surface       = surface,
         surface_index = surface.index,
     }
