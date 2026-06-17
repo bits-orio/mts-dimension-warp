@@ -153,6 +153,27 @@ local function teleport_platform(force_name, ctx)
         end
     end
 
+    --- Offline members travel by the SAME position rule. A disconnected player's
+    --- character is a STANDALONE entity (LuaPlayer.character is nil while
+    --- disconnected), so we find the character ENTITY on the source surface and
+    --- resolve its owning player via LuaEntity.player (valid for a disconnected
+    --- character). An on-platform offline character is MOVED to the destination
+    --- (the entity itself travels, so inventory + position are preserved AND it
+    --- isn't duplicated by the entity-clone pass below). An off-platform one is
+    --- left behind and dies -- the member respawns empty-handed on the platform
+    --- when they reconnect. Connected members were already moved above; characters
+    --- with no player (orphan bodies) are left to the entity clone as before.
+    for _, char in pairs(source.find_entities_filtered{type = "character"}) do
+        local p = char.player
+        if p and not p.connected then
+            if math2d.bounding_box.contains_point(platform_area_delta, char.position) then
+                dw.safe_teleport(char, destination, char.position, true)   -- move the body
+            elseif ctx.warp.previous.planet ~= "nauvis" then
+                char.die()
+            end
+        end
+    end
+
     --- Check for some other stuff we cannot just clone (due to mod scripts)
     --- Krastorio2 Shelter, as it creates stuff when built.
     local shelter_data = {}

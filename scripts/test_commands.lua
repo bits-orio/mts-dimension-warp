@@ -195,6 +195,67 @@ local function cmd_status(command)
         tostring(ctx.warp.pending_destination), tostring(ctx.warp.resume_chosen), tostring(ctx.timer.dock)))
 end
 
+-- P2 docking bay -------------------------------------------------------------
+-- /mdw-dock [planet] : park the caller's team in the dock NOW (bypasses the
+-- nobody-online gate). Optional deferred destination (default nauvis).
+local function cmd_dock(command)
+    local player, force_name, ctx = resolve(command, true)
+    if not ctx then return end
+    if not has_surface(ctx) then player.print("[MDW test] no current surface."); return end
+    if ctx.warp.docked then player.print("[MDW test] already docked -- use /mdw-resume."); return end
+    if ctx.warp.status ~= defines.warp.awaiting then
+        player.print("[MDW test] warp busy (status=" .. tostring(ctx.warp.status) .. ").")
+        return
+    end
+    local target = (command.parameter and command.parameter:match("%S+")) or "nauvis"
+    if target ~= "nauvis" and not game.planets[target] then
+        player.print("[MDW test] unknown planet '" .. target .. "'.")
+        return
+    end
+    dw.warp.depart_to_dock(force_name, ctx, target)
+    if ctx.warp.docked then
+        player.print(string.format("[MDW test] DOCKED on %s (deferred target=%s), team paused. /mdw-resume to thaw + warp out.",
+            has_surface(ctx) and ctx.warp.current.surface.name or "?", tostring(target)))
+    else
+        player.print("[MDW test] dock failed -- see log.")
+    end
+end
+
+-- /mdw-offlinewarp : fire a warp this tick with the team treated as fully
+-- OFFLINE, so the real warp_timer gate routes it to the dock. Exercises the
+-- genuine decision branch on a connected admin.
+local function cmd_offlinewarp(command)
+    local player, force_name, ctx = resolve(command, true)
+    if not ctx then return end
+    if not has_surface(ctx) then player.print("[MDW test] no current surface."); return end
+    if ctx.warp.docked then player.print("[MDW test] already docked."); return end
+    ctx.warp.test_offline = true                  -- one-shot: team_is_online -> false
+    ctx.timer.active = true
+    ctx.timer.warp = 0
+    ctx.timer.manual_warp = ctx.timer.manual_warp or ctx.timer.base
+    dw.warp.warp_timer(force_name, ctx)
+    ctx.warp.test_offline = nil                   -- clear if warp_timer returned before team_is_online
+    if ctx.warp.docked then
+        player.print("[MDW test] offline warp -> DEPARTED TO DOCK. /mdw-status, then /mdw-resume.")
+    else
+        player.print("[MDW test] expected to dock but did not (docked=" .. tostring(ctx.warp.docked) .. ") -- check log.")
+    end
+end
+
+-- /mdw-resume : choose resume on a docked team (the manual stand-in for the GUI
+-- button). Arms dock_timer to thaw power + force the warp out after the window.
+local function cmd_resume(command)
+    local player, force_name, ctx = resolve(command, true)
+    if not ctx then return end
+    if not ctx.warp.docked then player.print("[MDW test] not docked."); return end
+    if ctx.warp.resume_chosen then
+        player.print("[MDW test] resume already in progress (timer.dock=" .. tostring(ctx.timer.dock) .. ").")
+        return
+    end
+    ctx.warp.resume_chosen = true
+    player.print("[MDW test] resume chosen -> power thaws, forced warp out in ~60s. Watch /mdw-status timer.dock.")
+end
+
 commands.add_command("mdw-arm",    "[MDW test] research warp-generator-1 + unlock planets (arm warping)", cmd_arm)
 commands.add_command("mdw-warp",   "[MDW test] warp now [optional exact planet, e.g. nauvis]", cmd_warp)
 commands.add_command("mdw-warpx",  "[MDW test] warp <n> times in a row (max 10)", cmd_warpx)
@@ -202,3 +263,6 @@ commands.add_command("mdw-gen",    "[MDW test] research warp-generator-1..<N> (g
 commands.add_command("mdw-size",   "[MDW test] research warp-platform-size-1..<N> (grow platform)", cmd_size)
 commands.add_command("mdw-cheat",  "[MDW test] toggle cheat mode", cmd_cheat)
 commands.add_command("mdw-status", "[MDW test] print this team's warp state", cmd_status)
+commands.add_command("mdw-dock",        "[MDW test] depart to the dock now [optional deferred planet]", cmd_dock)
+commands.add_command("mdw-offlinewarp", "[MDW test] fire a warp as if nobody is online (-> dock)", cmd_offlinewarp)
+commands.add_command("mdw-resume",      "[MDW test] choose resume on a docked team (thaw + forced warp out)", cmd_resume)

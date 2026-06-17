@@ -175,6 +175,68 @@ end
 dw.generate_surface = generate_surface
 
 ------------------------------------------------------------
+--- On-demand safe DOCK surface (P2 docking bay -- ADR-0006)
+------------------------------------------------------------
+-- Created when a team's warp fires with NO member online: the platform parks
+-- here, frozen via MTS pause, until a member resumes. Created on demand and
+-- retired on resume, so only currently-docked teams cost a surface (the user's
+-- surface-budget concern). SAFE by construction -- enemies disabled + peaceful
+-- mode -- because the docked base is powerless (turrets off) and must not be
+-- attackable. Name "mdw-<force>-dock" is NON-VARIANT (dodges clone_mirror) and
+-- stable per team (a team docks at most once at a time).
+--
+-- Advances ctx.warp.current to the dock but does NOT advance ctx.warp.number:
+-- the dock DEFERS the warp; the real Arrive (and the number bump) happen when
+-- the team resumes and warps out to ctx.warp.pending_destination.
+local function generate_dock_surface(force_name, ctx)
+    if type(ctx) ~= "table" or not ctx.warp then return false end
+    if not (game.forces[force_name] and game.forces[force_name].valid) then return false end
+
+    local base_mapgen = (game.planets["neo-nauvis"] and game.planets["neo-nauvis"].prototype.map_gen_settings)
+        or game.surfaces.nauvis.map_gen_settings
+    local mapgen = table.deepcopy(base_mapgen)
+    mapgen.autoplace_controls = mapgen.autoplace_controls or {}
+    mapgen.autoplace_controls["enemy-base"] = { frequency = 0, size = 0, richness = 0 }
+    mapgen.peaceful_mode = true
+    mapgen.seed = map_seed()   -- deterministic: the dock is identical for all teams
+
+    -- Unique per dock cycle: ctx.warp.number is stable while docked (docking does
+    -- not bump it) and increments after each resume warp, so successive docks get
+    -- distinct names -- a fresh dock can never alias the PREVIOUS dock that is
+    -- still being deleted asynchronously (game.delete_surface is deferred).
+    local dock_name = "mdw-" .. force_name .. "-dock-w" .. ctx.warp.number
+    dw.diag("generate_dock_surface force=%s name=%s", force_name, dock_name)
+    local surface_name = remote.call("mts-v1", "create_team_surface", force_name, {
+        name             = dock_name,
+        planet           = "neo-nauvis",
+        map_gen_settings = mapgen,
+    })
+    local surface = surface_name and game.surfaces[surface_name]
+    if not (surface and surface.valid) then
+        dw.diag("generate_dock_surface force=%s CREATE FAILED", force_name)
+        return false
+    end
+
+    ctx.warp.previous = ctx.warp.current   -- the team's old (real) world, retired next
+    ctx.warp.current  = {
+        name          = surface.name,
+        planet        = "neo-nauvis",
+        surface       = surface,
+        surface_index = surface.index,
+    }
+    ctx.warp.dock_surface_name  = surface.name
+    ctx.warp.dock_surface_index = surface.index
+
+    dw.set_surface_owner(surface.index, force_name)
+    surface.request_to_generate_chunks({x = 0, y = 0}, ctx.platform.warp.size / 32 + 1)
+    surface.force_generate_chunk_requests()
+    dw.diag("generate_dock_surface force=%s DOCKED current=%s (number unchanged=%d)",
+        force_name, dw.diag_surface(surface), ctx.warp.number)
+    return true
+end
+dw.generate_dock_surface = generate_dock_surface
+
+------------------------------------------------------------
 --- Previous-surface retirement (replaces game.delete_surface)
 ------------------------------------------------------------
 -- After the platform has been cloned onto the new surface, retire the old one

@@ -91,7 +91,11 @@ end
 local function prepare_warp_to_next_surface(force_name, ctx, target)
     dw.diag("prepare_warp[%s]: ENTER status=%s target=%s from=%s",
         force_name, tostring(ctx.warp.status), tostring(target), dw.diag_surface(ctx.warp.current.surface))
-    if ctx.warp.status ~= defines.warp.awaiting then return end
+    -- Returns true iff the team actually ADVANCED (surface created + platform
+    -- cloned). The dock-resume path (dock_timer) relies on this to know whether
+    -- to tear down dock state or stay docked and retry -- so a transient MTS
+    -- create failure can never strand a team off its dock with a lost destination.
+    if ctx.warp.status ~= defines.warp.awaiting then return false end
     ctx.warp.status = defines.warp.preparing
 
     -- generate_surface advances ctx to the new surface (or rolls back on a failed
@@ -100,7 +104,7 @@ local function prepare_warp_to_next_surface(force_name, ctx, target)
     if not dw.generate_surface(force_name, ctx, target) then
         dw.diag("prepare_warp[%s]: generate_surface=false -> rollback to awaiting", force_name)
         ctx.warp.status = defines.warp.awaiting
-        return
+        return false
     end
     dw.diag("prepare_warp[%s]: generate_surface=true -> %s", force_name, dw.diag_surface(ctx.warp.current.surface))
 
@@ -114,6 +118,7 @@ local function prepare_warp_to_next_surface(force_name, ctx, target)
     dw.update_surfaces_properties(force_name, ctx)
     dw.diag("prepare_warp[%s]: DONE now on %s (warp_number=%d)",
         force_name, tostring(ctx.warp.current.name), ctx.warp.number)
+    return true
 end
 
 local function reset_timer_vote(ctx)
@@ -127,6 +132,63 @@ local function reset_timer_vote(ctx)
     ctx.votes.players = {}
 
 end
+
+------------------------------------------------------------
+--- P2 docking bay (ADR-0006)
+------------------------------------------------------------
+-- Resume -> forced-warp-out timing. Constants for now (promote to settings if
+-- the cadence needs tuning). Power returns instantly on resume; the ~60s window
+-- (with an "imminent" ping at ~30s) caps the powered time so the dock is an
+-- airlock, not a campsite.
+local DOCK_FORCED_WARP_SECONDS = 60
+local DOCK_IMMINENT_SECONDS    = 30
+
+-- Is ANY member of this team online right now? Reads the mts-v1 liveness query.
+-- ctx.warp.test_offline is a one-shot override (set by /mdw-offlinewarp) so the
+-- depart-to-dock path is exercisable by a single connected admin.
+local function team_is_online(force_name, ctx)
+    if ctx.warp.test_offline then
+        ctx.warp.test_offline = nil               -- one-shot
+        return false
+    end
+    local ok, online = pcall(remote.call, 'mts-v1', 'is_team_online', force_name)
+    if not ok then return true end                -- fail-safe: API missing -> warp normally
+    return online and true or false
+end
+
+-- Park the platform on its on-demand safe dock surface instead of warping to a
+-- hostile, undefended world (ADR-0006). Mirrors prepare_warp_to_next_surface,
+-- but creates a dock surface, freezes the team via MTS pause, and DEFERS the
+-- real destination (ctx.warp.pending_destination) until the team resumes.
+local function depart_to_dock(force_name, ctx, target)
+    dw.diag("depart_to_dock[%s]: ENTER deferred_target=%s from=%s",
+        force_name, tostring(target), dw.diag_surface(ctx.warp.current.surface))
+    if ctx.warp.status ~= defines.warp.awaiting then return end
+    ctx.warp.status = defines.warp.preparing
+    ctx.warp.pending_destination = target
+
+    if not dw.generate_dock_surface(force_name, ctx) then
+        dw.diag("depart_to_dock[%s]: generate_dock_surface=false -> rollback", force_name)
+        ctx.warp.status = defines.warp.awaiting
+        ctx.warp.pending_destination = nil
+        return
+    end
+
+    ctx.warp.status = defines.warp.warping
+    dw.teleport_platform(force_name, ctx)            -- clone the base: old world -> dock
+    dw.update_surfaces_properties(force_name, ctx)   -- retire the old world (resets status to awaiting)
+    dw.update_warp_platform_size(force_name, ctx)    -- re-lay platform tiles on the dock
+
+    ctx.warp.docked = true
+    ctx.warp.resume_chosen = false
+    ctx.timer.dock = nil
+    ctx.warp.status = defines.warp.docked
+    remote.call('mts-v1', 'pause_team', force_name)  -- freeze the parked base
+
+    dw.diag("depart_to_dock[%s]: DOCKED on %s (deferred target=%s) -- team paused",
+        force_name, dw.diag_surface(ctx.warp.current.surface), tostring(target))
+end
+dw.warp.depart_to_dock = depart_to_dock
 
 local function warp_timer(force_name, ctx)
     -- Skip a team MTS has paused: no warp clock, no ticking, no warp.
@@ -142,6 +204,10 @@ local function warp_timer(force_name, ctx)
         end
         return
     end
+
+    -- A docked team is driven by dock_timer, not the normal warp loop -- even
+    -- after resume thaws power (unpauses), the dock countdown owns the warp.
+    if ctx.warp.docked then return end
 
     if not ctx.nauvis_lab_exploded then return end
 
@@ -174,6 +240,12 @@ local function warp_timer(force_name, ctx)
                 game.print({"dw-messages.stay-on-nauvis"})
                 reset_timer_vote(ctx)
                 dw.gui.update_manual_warp_button()
+            elseif not team_is_online(force_name, ctx) then
+                -- Nobody online: park in the safe dock instead of dropping the
+                -- base on a hostile, undefended world (ADR-0006). The real
+                -- destination is deferred to ctx.warp.pending_destination.
+                dw.diag("warp_timer[%s]: nobody online -> DEPART TO DOCK (deferred=%s)", force_name, tostring(target))
+                depart_to_dock(force_name, ctx, target)
             else
                 -- return warp gate
                 if storage.warpgate.mobile_gate then
@@ -212,6 +284,78 @@ local function warp_timer(force_name, ctx)
     dw.gui.update()
 end
 dw.warp.warp_timer = warp_timer
+
+-- P2 dock resume countdown. Drives a DOCKED team (warp_timer skips them). Idle
+-- until a member chooses resume (ctx.warp.resume_chosen -- set by the GUI button
+-- or /mdw-resume); then it thaws power instantly (unpause_team), waits the ~60s
+-- airlock window (with an "imminent" ping at ~30s), and forces the deferred warp
+-- out to ctx.warp.pending_destination -- the real Arrive, which advances the warp
+-- number and retires the dock.
+local function dock_timer(force_name, ctx)
+    if not ctx.warp.docked then return end
+    local force = game.forces[force_name]
+
+    -- Not yet resuming: hold the airlock frozen. SELF-HEAL -- if a docked team was
+    -- thawed OUT OF BAND (MTS on_configuration_changed auto-resume, an admin
+    -- /mts-resume), re-freeze it so a parked base never sits powered-but-warp-
+    -- frozen with no clock and no way to leave. The 'docked => paused' invariant
+    -- holds without depending on MTS knowing about docking.
+    if not ctx.warp.resume_chosen then
+        local ok, paused = pcall(remote.call, 'mts-v1', 'is_team_paused', force_name)
+        if ok and not paused then
+            remote.call('mts-v1', 'pause_team', force_name)
+            dw.diag("dock_timer[%s]: re-froze out-of-band-thawed dock", force_name)
+        end
+        return
+    end
+
+    -- First tick after resume: thaw (instant power) + arm the countdown.
+    if ctx.timer.dock == nil then
+        remote.call('mts-v1', 'unpause_team', force_name)
+        ctx.timer.dock = DOCK_FORCED_WARP_SECONDS
+        if force and force.valid then
+            force.print("Resuming -- power restored. Forced warp out in " .. DOCK_FORCED_WARP_SECONDS .. "s.")
+        end
+        dw.diag("dock_timer[%s]: RESUME -> thawed (unpause), countdown=%ds", force_name, DOCK_FORCED_WARP_SECONDS)
+        return
+    end
+
+    ctx.timer.dock = ctx.timer.dock - 1
+    if ctx.timer.dock == DOCK_IMMINENT_SECONDS and force and force.valid then
+        force.print("Warp imminent!")
+    end
+
+    if ctx.timer.dock <= 0 then
+        local target = ctx.warp.pending_destination
+        dw.diag("dock_timer[%s]: FORCED WARP out of dock -> %s", force_name, tostring(target))
+        -- prepare_warp needs status==awaiting to run. KEEP the rest of the dock
+        -- state until the warp CONFIRMS it advanced -- create_team_surface can fail
+        -- transiently, and tearing down first would strand the team unpaused on a
+        -- leaked dock with the deferred destination lost.
+        ctx.warp.status = defines.warp.awaiting
+        if prepare_warp_to_next_surface(force_name, ctx, target) then
+            -- Arrived: the dock became 'previous' and was retired. Clear dock state.
+            ctx.warp.docked = false
+            ctx.warp.resume_chosen = false
+            ctx.warp.pending_destination = nil
+            ctx.warp.dock_surface_name = nil
+            ctx.warp.dock_surface_index = nil
+            ctx.timer.dock = nil
+            game.play_sound{path = "dw-warpdrive"}
+            reset_timer_vote(ctx)
+            dw.set_warp_evolution_factor(force_name, ctx)
+            ctx.pollution = 1
+            dw.gui.update_manual_warp_button()
+            dw.update_warp_platform_size(force_name, ctx)
+        else
+            -- Transient create failure: stay docked + frozen, retry shortly.
+            dw.diag("dock_timer[%s]: warp-out FAILED -> stay docked, retry in 5s", force_name)
+            ctx.warp.status = defines.warp.docked
+            ctx.timer.dock = 5
+        end
+    end
+end
+dw.warp.dock_timer = dock_timer
 
 
 local function update_warp_vote_threshold()
@@ -291,6 +435,7 @@ end
 -- second, calling warp_timer(force_name, ctx). Replaces the upstream global
 -- on_nth_tick_60 singleton.
 dw.register_team_tick(60, warp_timer)
+dw.register_team_tick(60, dock_timer)
 dw.register_event(defines.events.on_research_finished, warp_generator_research)
 dw.register_event(defines.events.on_player_joined_game, update_warp_vote_join)
 dw.register_event(defines.events.on_player_left_game, update_warp_vote_leave)
