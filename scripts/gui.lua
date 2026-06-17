@@ -461,23 +461,29 @@ local function show_dock_prompt(player, ctx)
     local screen = player.gui.screen
     local frame = screen[DOCK_PROMPT]
     if not frame then
-        frame = screen.add{type = "frame", name = DOCK_PROMPT, direction = "vertical", caption = "Base docked"}
+        frame = screen.add{type = "frame", name = DOCK_PROMPT, direction = "vertical"}
         frame.auto_center = true
-        local body = frame.add{type = "label", name = "body",
-            caption = "Your base parked in a docking bay because the warp fired while your team was offline. "
-                .. "It is frozen and safe here. Resume to restore power and warp out to your next world."}
+        -- Draggable titlebar (title + a draggable filler), matching the project's
+        -- other movable windows.
+        local titlebar = frame.add{type = "flow", name = "titlebar", direction = "horizontal"}
+        titlebar.add{type = "label", style = "frame_title", caption = {"dw-gui.dock-title"}}
+        local drag = titlebar.add{type = "empty-widget", name = "drag", style = "draggable_space_header"}
+        drag.style.horizontally_stretchable = true
+        drag.style.height = 24
+        drag.drag_target = frame
+        local body = frame.add{type = "label", name = "body", caption = {"dw-gui.dock-body"}}
         body.style.single_line = false
         body.style.maximal_width = 380
         body.style.bottom_padding = 8
-        frame.add{type = "button", name = "dw_dock_resume", caption = "Resume warp", style = "confirm_button"}
+        frame.add{type = "button", name = "dw_dock_resume", caption = {"dw-gui.dock-resume"}, style = "confirm_button"}
         frame.add{type = "label", name = "status", caption = ""}
     end
     -- Reflect resume state: once chosen, disable the button and show the countdown.
     if ctx.warp.resume_chosen then
         frame.dw_dock_resume.enabled = false
         local left = ctx.timer.dock
-        frame.status.caption = left and ("Resuming -- warp out in " .. math.max(0, math.floor(left)) .. "s")
-            or "Resuming -- restoring power..."
+        frame.status.caption = left and {"dw-gui.dock-status-countdown", math.max(0, math.floor(left))}
+            or {"dw-gui.dock-status-restoring"}
     else
         frame.dw_dock_resume.enabled = true
         frame.status.caption = ""

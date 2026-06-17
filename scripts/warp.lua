@@ -329,7 +329,7 @@ local function dock_timer(force_name, ctx)
         end
         ctx.timer.dock = DOCK_FORCED_WARP_SECONDS
         if force and force.valid then
-            force.print("Resuming -- power restored. Forced warp out in " .. DOCK_FORCED_WARP_SECONDS .. "s.")
+            force.print({"dw-messages.dock-resume-print", DOCK_FORCED_WARP_SECONDS})
         end
         dw.diag("dock_timer[%s]: RESUME -> thawed (unpause), countdown=%ds", force_name, DOCK_FORCED_WARP_SECONDS)
         return
@@ -337,7 +337,7 @@ local function dock_timer(force_name, ctx)
 
     ctx.timer.dock = ctx.timer.dock - 1
     if ctx.timer.dock == DOCK_IMMINENT_SECONDS and force and force.valid then
-        force.print("Warp imminent!")
+        force.print({"dw-messages.dock-imminent"})
     end
 
     if ctx.timer.dock <= 0 then
