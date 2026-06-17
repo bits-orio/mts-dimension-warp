@@ -48,6 +48,24 @@ local function on_team_created(event)
     -- Initialize the per-team bundle. Warp #0 adoption and the timer arm on the
     -- on_team_surface_created / on_team_clock_started events below.
     dw.create_warp_ctx(force_name)
+
+    -- Pre-grant the 'neo-nauvis' technology. Its ONLY research_trigger is
+    -- build-entity "warp-gate", which has no recipe/item in MDW (the lab-intro
+    -- that placed the gate is disabled), so it is otherwise UN-researchable --
+    -- and it gates the entire warp chain (warp-generator-1 and warp-platform-
+    -- size-1 both prerequisite it). The team already spawns ON neo-nauvis (warp
+    -- #0 adoption), so its unlock-space-location effect is moot. Granting it here
+    -- makes warp-generator-1 researchable. Safe against MTS team setup: MTS's
+    -- claim_team_slot runs force.reset() BEFORE it raises on_team_created, so
+    -- this grant is not wiped. It fires on_research_finished with by_script=true,
+    -- which MTS's tech-records + bridge now skip, so it isn't announced.
+    local force = game.forces[force_name]
+    local neo = force and force.valid and force.technologies["neo-nauvis"]
+    if neo and not neo.researched then
+        neo.researched = true
+        dw.diag("on_team_created: force=%s pre-granted neo-nauvis tech (warp-chain unlock)", force_name)
+    end
+
     dw.diag("on_team_created: force=%s ctx made", force_name)
 end
 
