@@ -24,6 +24,16 @@ local function ctx_for_player(player)
     return dw.warp_ctx(force_name)
 end
 
+-- Like ctx_for_player but SPECTATOR-AWARE: resolves the player's REAL team (via
+-- dw.effective_force / mts-v1), so a member spectating another team still maps to
+-- their own team's ctx. Used by the dock prompt path so a returning member who
+-- spectates can still see the prompt and resume.
+local function effective_team_ctx(player)
+    local fn = dw.effective_force(player)
+    if fn and dw.has_warp_ctx(fn) then return dw.warp_ctx(fn) end
+    return nil
+end
+
 local function get_player_gui_settings(player)
     local player_settings = settings.get_player_settings(player)
     return {
@@ -257,6 +267,14 @@ local function warp_frame_click(event)
         end
     end
 
+    if button.name == "dw_dock_resume" then
+        local ctx = effective_team_ctx(player)
+        if ctx and ctx.warp.docked and not ctx.warp.resume_chosen then
+            ctx.warp.resume_chosen = true
+            dw.diag("dock resume chosen via GUI: player=%s team=%s", player.name, dw.effective_force(player))
+        end
+    end
+
     if button.name == "container_toggle" then
         local frame = get_container_frame(player)
         frame.visible = not frame.visible
@@ -424,6 +442,68 @@ local function on_player_created(event)
     prepare_warp_gui(player)
 end
 
+------------------------------------------------------------
+--- P2 docking bay resume prompt (ADR-0006)
+------------------------------------------------------------
+-- A centered prompt shown to an online member of a DOCKED team. Clicking
+-- "Resume warp" sets ctx.warp.resume_chosen, which dock_timer (warp.lua) acts on
+-- to thaw power and warp the parked base out. Shown/hidden each second from
+-- update() and immediately on join.
+local DOCK_PROMPT = "dw_dock_prompt"
+
+local function hide_dock_prompt(player)
+    local f = player.gui.screen[DOCK_PROMPT]
+    if f then f.destroy() end
+end
+dw.gui.hide_dock_prompt = hide_dock_prompt
+
+local function show_dock_prompt(player, ctx)
+    local screen = player.gui.screen
+    local frame = screen[DOCK_PROMPT]
+    if not frame then
+        frame = screen.add{type = "frame", name = DOCK_PROMPT, direction = "vertical", caption = "Base docked"}
+        frame.auto_center = true
+        local body = frame.add{type = "label", name = "body",
+            caption = "Your base parked in a docking bay because the warp fired while your team was offline. "
+                .. "It is frozen and safe here. Resume to restore power and warp out to your next world."}
+        body.style.single_line = false
+        body.style.maximal_width = 380
+        body.style.bottom_padding = 8
+        frame.add{type = "button", name = "dw_dock_resume", caption = "Resume warp", style = "confirm_button"}
+        frame.add{type = "label", name = "status", caption = ""}
+    end
+    -- Reflect resume state: once chosen, disable the button and show the countdown.
+    if ctx.warp.resume_chosen then
+        frame.dw_dock_resume.enabled = false
+        local left = ctx.timer.dock
+        frame.status.caption = left and ("Resuming -- warp out in " .. math.max(0, math.floor(left)) .. "s")
+            or "Resuming -- restoring power..."
+    else
+        frame.dw_dock_resume.enabled = true
+        frame.status.caption = ""
+    end
+end
+dw.gui.show_dock_prompt = show_dock_prompt
+
+-- Dedicated dock-prompt driver: runs every second REGARDLESS of warp/pause state.
+-- The main panel update() is driven by warp_timer, which early-returns for
+-- docked/paused teams, so it CANNOT keep the resume countdown current (a solo
+-- game would freeze the prompt in its pre-click state). This iterates connected
+-- players and resolves each one's REAL team (spectator-aware), so it also reaches
+-- a docked team's member who is spectating another team. Show/hide lives here, not
+-- in update().
+local function dock_prompt_driver()
+    for _, player in pairs(game.connected_players) do
+        local ctx = effective_team_ctx(player)
+        if ctx and ctx.warp.docked then
+            show_dock_prompt(player, ctx)
+        else
+            hide_dock_prompt(player)
+        end
+    end
+end
+dw.register_event("on_nth_tick_60", dock_prompt_driver)
+
 --- Update all the GUI information (except items). Single global handler: iterate
 --- connected players and refresh each one's warp frame against their OWN team's
 --- ctx. Non-team players have no ctx (and a hidden warp frame), so skip them.
@@ -468,13 +548,27 @@ local function update()
             frame.warp_timer_manual.caption = {"dw-gui.manualwarp_timer", timer}
         end
 
+        -- (Dock resume prompt is driven separately by dock_prompt_driver, which
+        -- runs unconditionally + spectator-aware -- update() is warp_timer-gated.)
         ::continue::
     end
 end
 dw.gui.update = update
 
+-- Show the dock prompt the instant a member returns to a docked team (update()
+-- also covers it within a second, but this avoids the visible delay).
+local function on_player_joined(event)
+    local player = game.players[event.player_index]
+    if not (player and player.valid) then return end
+    local ctx = effective_team_ctx(player)
+    if ctx and ctx.warp.docked then
+        show_dock_prompt(player, ctx)
+    end
+end
+
 dw.register_event('on_init', on_init)
 dw.register_event('on_configuration_changed', on_init)
 dw.register_event(defines.events.on_player_created, on_player_created)
+dw.register_event(defines.events.on_player_joined_game, on_player_joined)
 dw.register_event(defines.events.on_gui_click, warp_frame_click)
 dw.register_event(defines.events.on_gui_elem_changed, item_watch_changed)

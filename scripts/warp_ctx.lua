@@ -187,6 +187,20 @@ function dw.has_warp_ctx(force_name)
     return storage.teams ~= nil and storage.teams[force_name] ~= nil
 end
 
+-- Resolve a player's EFFECTIVE team force name, spectator-aware. A member
+-- spectating another team is on the 'spectator' force, so player.force.name is
+-- NOT their team; mts-v1 get_effective_force returns the real team. Used by the
+-- dock prompt + member-gather so a spectating member still resumes/travels with
+-- their own team. Falls back to the live force name if the query is unavailable.
+function dw.effective_force(player)
+    if not (player and player.valid) then return nil end
+    local fn = player.force.name
+    if fn:find("^team%-") then return fn end
+    local ok, real = pcall(remote.call, 'mts-v1', 'get_effective_force', player.index)
+    if ok and real then return real end
+    return fn
+end
+
 ------------------------------------------------------------
 --- Surface index <-> force reverse map
 ------------------------------------------------------------

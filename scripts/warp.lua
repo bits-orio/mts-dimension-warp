@@ -312,6 +312,21 @@ local function dock_timer(force_name, ctx)
     -- First tick after resume: thaw (instant power) + arm the countdown.
     if ctx.timer.dock == nil then
         remote.call('mts-v1', 'unpause_team', force_name)
+        -- Gather the team's online members onto the dock platform so they travel
+        -- with the base when the forced warp fires -- a member who reconnected
+        -- elsewhere (e.g. the landing pen) would otherwise be left behind.
+        local dock = ctx.warp.current and ctx.warp.current.surface
+        if dock and dock.valid then
+            for _, p in pairs(game.connected_players) do
+                -- Spectator-aware: a member spectating another team is on the
+                -- 'spectator' force, but dw.effective_force gives their real team,
+                -- so they aren't left behind on the dock when it's retired.
+                if p.valid and dw.effective_force(p) == force_name
+                    and (not p.character or p.character.surface ~= dock) then
+                    dw.safe_teleport(p, dock, {0, 0}, true)
+                end
+            end
+        end
         ctx.timer.dock = DOCK_FORCED_WARP_SECONDS
         if force and force.valid then
             force.print("Resuming -- power restored. Forced warp out in " .. DOCK_FORCED_WARP_SECONDS .. "s.")
