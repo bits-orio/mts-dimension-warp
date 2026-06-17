@@ -190,6 +190,9 @@ local function cmd_status(command)
     player.print(string.format("[MDW status] timer active=%s base=%ds warp=%s manual=%s | platform.size=%d | victory=%s",
         tostring(ctx.timer.active), ctx.timer.base, tostring(ctx.timer.warp),
         tostring(ctx.timer.manual_warp), ctx.platform.warp.size, tostring(ctx.victory)))
+    player.print(string.format("[MDW status] dock: docked=%s surface=%s pending=%s resume_chosen=%s timer.dock=%s",
+        tostring(ctx.warp.docked), tostring(ctx.warp.dock_surface_name),
+        tostring(ctx.warp.pending_destination), tostring(ctx.warp.resume_chosen), tostring(ctx.timer.dock)))
 end
 
 commands.add_command("mdw-arm",    "[MDW test] research warp-generator-1 + unlock planets (arm warping)", cmd_arm)

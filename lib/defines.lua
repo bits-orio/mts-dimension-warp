@@ -12,6 +12,10 @@ defines.warp = {
     awaiting = 1,
     preparing = 2,
     warping = 3,
+    -- P2 docking bay (ADR-0006): a warp that fired with nobody online parked the
+    -- platform on a safe dock surface, frozen via MTS pause, awaiting a member's
+    -- resume. The warp loop is suspended while docked.
+    docked = 4,
 }
 
 defines.loader_facing = {

@@ -64,6 +64,15 @@ local function new_ctx()
             status = defines.warp.awaiting,
             time = game.tick,
             preferred_destination = nil,
+
+            -- P2 docking bay (ADR-0006). Set when a warp fires with nobody
+            -- online: the platform parks on its own on-demand dock surface,
+            -- frozen via MTS pause, until a member resumes.
+            docked = false,
+            dock_surface_name = nil,   -- the ephemeral safe dock surface
+            dock_surface_index = nil,
+            pending_destination = nil, -- the real planet to Arrive on at resume
+            resume_chosen = false,     -- a member chose to resume (arms the thaw)
         },
 
         -- timers are in seconds, not ticks
@@ -72,6 +81,7 @@ local function new_ctx()
             base = 20 * 60, -- 20 min auto-warp
             warp = nil,         -- countdown to the next warp
             manual_warp = nil,  -- player-vote warp countdown
+            dock = nil,         -- P2: resume countdown (thaw -> forced warp out)
         },
 
         -- warp voting
