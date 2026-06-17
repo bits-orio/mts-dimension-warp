@@ -52,7 +52,23 @@ end
 
 
 local function select_destination(force_name, ctx)
+    -- Test override (set by the /mdw-warp admin command): force a one-shot exact
+    -- destination, bypassing the unlocked-planet filter + randomness. Consumed
+    -- here so it never leaks into a subsequent real auto-warp.
+    if ctx.warp.test_destination then
+        local forced = ctx.warp.test_destination
+        ctx.warp.test_destination = nil
+        dw.diag("select_destination[%s]: TEST override -> %s", force_name, tostring(forced))
+        return forced
+    end
     local total_dest, destinations = get_allowed_planet(force_name, ctx)
+    -- No unlocked planets: warp to nauvis rather than indexing destinations with
+    -- math.random(0), whose empty interval errors. A team with nothing unlocked
+    -- simply falls back to nauvis.
+    if total_dest == 0 then
+        dw.diag("select_destination[%s]: no unlocked destinations -> nauvis", force_name)
+        return "nauvis"
+    end
     if ctx.warp.preferred_destination then
         if ctx.warp.preferred_destination == "nauvis" then
             dw.diag("select_destination[%s]: preferred=nauvis -> nauvis (allowed=%d)", force_name, total_dest)

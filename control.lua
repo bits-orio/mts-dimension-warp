@@ -188,4 +188,7 @@ require "scripts.entities.dimension-crane"
 
 require "compatibility.picker-dollies"
 
+-- Admin-only /mdw-* console commands to speedrun the warp flow while testing.
+require "scripts.test_commands"
+
 -- require "scripts.debug"
