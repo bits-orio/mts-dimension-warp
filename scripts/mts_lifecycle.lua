@@ -165,8 +165,24 @@ local function on_team_released(event)
     local force_name = event.force_name
     if not force_name then return end
     dw.diag("on_team_released: force=%s tearing down warp ctx", force_name)
+    -- Explicitly retire the PERMANENT dimension surfaces (factory/mining/power).
+    -- Unlike the rolling warp surfaces, their non-variant 'mdw-<force>-<role>'
+    -- names are NOT caught by MTS's cleanup_force_surfaces prefix sweep, and the
+    -- map_force_to_planets[base] slot can collide with a warp surface on the same
+    -- base planet -- so MTS would leak them. Retire here, BEFORE destroy_warp_ctx
+    -- drops the handles.
+    if dw.has_warp_ctx(force_name) then
+        local ctx = dw.warp_ctx(force_name)
+        for _, role in ipairs({"factory", "mining", "power"}) do
+            local s = ctx.platform[role].surface
+            if s and s.valid then
+                dw.diag("on_team_released: force=%s retiring %s surface %s", force_name, role, s.name)
+                pcall(remote.call, "mts-v1", "retire_team_surface", force_name, s.name)
+            end
+        end
+    end
     -- Drop the bundle and forget the team's surface-index mappings. MTS has
-    -- already deleted the surfaces themselves.
+    -- already deleted the rolling warp surfaces themselves.
     dw.destroy_warp_ctx(force_name)
 end
 

@@ -48,12 +48,15 @@ local function new_ctx()
             planet_selector_list = {},
         },
 
-        -- platform sizes + their surfaces
+        -- platform sizes + their surfaces. electrified_ground (set by the
+        -- electrified-ground tech) flips all three dimension surfaces to
+        -- always_day + a global electric network.
         platform = {
             warp    = {size = dw.platform_size.warp[1]},
             factory = {size = 0, surface = nil},
             mining  = {size = {x = 0, y = 0}, surface = nil},
             power   = {size = 0, water = false, surface = nil},
+            electrified_ground = false,
         },
 
         -- warp state machine
@@ -120,18 +123,29 @@ local function new_ctx()
             pipes_type = "dw-pipe",
             chest_pairs = {},
             pipe_pairs = {},
-            chest_loader_pairs = {gate = {}, surface = {}, produstia = {}, smeltus = {}, electria = {}},
+            -- Buckets keyed by per-team ROLE token (NOT surface name), resolved
+            -- via dw.surface_role: 'surface' = the warp surface, 'gate' = the
+            -- warp-gate cluster, factory/mining/power = the three dimension
+            -- surfaces. Upstream keyed these by bare surface name (produstia/
+            -- smeltus/electria), which collapses under per-team unique names.
+            chest_loader_pairs = {gate = {}, surface = {}, factory = {}, mining = {}, power = {}},
         },
 
         -- accumulated pollution multiplier (grows to spawn biters)
         pollution = 1,
 
-        -- warp gate entity + mobile inventory persistence
+        -- warp gate entity + mobile inventory persistence. gate/gatepole are the
+        -- static cluster on the warp surface; mobile_gate is the player-carried
+        -- gate; mobile_type is its current item name (grows with gate research).
         warpgate = {
             chest_number = 2,
             type = "warp-gate",
             mobile_chests = {},
             mobile_loaders = {},
+            gate = nil,
+            gatepole = nil,
+            mobile_gate = nil,
+            mobile_type = nil,
         },
 
         -- harvester platforms (left/right)
@@ -143,10 +157,17 @@ local function new_ctx()
             right = {gate = nil, area = nil, size = 0, loaders = {}},
         },
 
-        -- space-age agricultural entities (Gleba); populated lazily on first Gleba warp
+        -- space-age agricultural cranes (Gleba): tower lists plus the seed/fruit
+        -- chests + shared pole created on the mining platform by the
+        -- dimension-crane research (populated lazily on first Gleba warp).
         agricultural = {
             yumako_towers = {},
             jellynut_towers = {},
+            yumako_input = nil,
+            yumako_output = nil,
+            jellynut_input = nil,
+            jellynut_output = nil,
+            pole = nil,
         },
 
         -- lab intro / nauvis bootstrap flags
@@ -169,6 +190,34 @@ end
 ------------------------------------------------------------
 --- Lazy accessor
 ------------------------------------------------------------
+
+-- Forward-compat for saves created BEFORE the P4 aux port. Factorio only fires
+-- on_configuration_changed on a VERSION change, so a same-version code reload of
+-- a long-running save would otherwise skip every migration. We therefore reshape
+-- each ctx lazily, here at the single chokepoint every consumer goes through.
+-- Idempotent + cheap: the guard short-circuits the instant the new shape exists,
+-- so it is a one-time fixup per team and a no-op forever after.
+--
+-- The one shape change that would CRASH the new code on an old ctx: P4 renamed
+-- the chest_loader_pairs buckets from planet names (produstia/smeltus/electria)
+-- to role tokens (factory/mining/power). The logistics layer indexes
+-- ctx.stairs.chest_loader_pairs[role], so a missing 'factory' bucket nil-indexes.
+-- The old aux code was flat (never wrote ctx.stairs), so these buckets are empty
+-- on every pre-P4 save -- the rename just needs the new keys to exist. Everything
+-- else P4 added (electrified_ground, warpgate handles, agricultural chests) is a
+-- nil-default the code already reads safely, so it needs no migration.
+local function ensure_p4_shape(ctx)
+    local clp = ctx.stairs and ctx.stairs.chest_loader_pairs
+    if clp and clp.factory == nil then
+        clp.factory = clp.produstia or {}
+        clp.mining  = clp.smeltus  or {}
+        clp.power   = clp.electria or {}
+        clp.gate    = clp.gate    or {}
+        clp.surface = clp.surface or {}
+        clp.produstia, clp.smeltus, clp.electria = nil, nil, nil
+    end
+end
+
 -- Returns the bundle for force_name, creating it on first call. This is the
 -- single entry point every consumer uses instead of touching storage.teams
 -- directly, so the create-on-demand invariant lives in one place.
@@ -178,6 +227,8 @@ function dw.warp_ctx(force_name)
     if not ctx then
         ctx = new_ctx()
         storage.teams[force_name] = ctx
+    else
+        ensure_p4_shape(ctx)
     end
     return ctx
 end
@@ -199,6 +250,23 @@ function dw.effective_force(player)
     local ok, real = pcall(remote.call, 'mts-v1', 'get_effective_force', player.index)
     if ok and real then return real end
     return fn
+end
+
+-- Resolve which ROLE a surface plays in a team's setup: 'factory'/'mining'/
+-- 'power' for the three permanent dimension surfaces, else 'surface' (the warp
+-- surface, the dock, or anything else). This REPLACES upstream's
+-- dw.safe_surfaces[surface.name] keying, which collapses under per-team unique
+-- surface names (mdw-team-1-factory is not "produstia"). The 'gate' bucket is a
+-- literal owned by the warp-gate code, not produced here. Compares live surface
+-- handles, so it self-heals when the warp surface is replaced on each warp.
+function dw.surface_role(ctx, surface)
+    if not (ctx and surface and surface.valid) then return "surface" end
+    local idx = surface.index
+    local p = ctx.platform
+    if p.factory.surface and p.factory.surface.valid and p.factory.surface.index == idx then return "factory" end
+    if p.mining.surface  and p.mining.surface.valid  and p.mining.surface.index  == idx then return "mining" end
+    if p.power.surface   and p.power.surface.valid   and p.power.surface.index   == idx then return "power" end
+    return "surface"
 end
 
 ------------------------------------------------------------

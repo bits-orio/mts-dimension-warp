@@ -1,11 +1,22 @@
-
-
+-- PORTED to per-team ctx (P4/S7). The reset commands take no force argument; they
+-- resolve the INVOKING player's team (spectator-aware) and reset only that team's
+-- platforms / harvesters. Run from the server console (no player) they no-op.
 
 local function reset_platforms(command)
-    if not storage.platform.factory.surface then return end
+    if not command.player_index then return end
+    local player = game.players[command.player_index]
+    if not (player and player.valid) then return end
+    local force_name = dw.effective_force(player)
+    if not (force_name and dw.has_warp_ctx(force_name)) then return end
+    local ctx = dw.warp_ctx(force_name)
+    if not ctx.platform.factory.surface then return end
+    -- reset_platforms rebuilds the warp<->factory links, so the warp surface must
+    -- be live too (it's deref'd below for the radio pole + stairs).
+    if not (ctx.warp.current.surface and ctx.warp.current.surface.valid) then return end
 
-    local platform_area = math2d.bounding_box.create_from_centre({0, 0}, storage.platform.warp.size, storage.platform.warp.size)
-    local surface = storage.warp.current.surface
+    local force = game.forces[force_name]
+    local platform_area = math2d.bounding_box.create_from_centre({0, 0}, ctx.platform.warp.size, ctx.platform.warp.size)
+    local surface = ctx.warp.current.surface
     local entity_list = {
         "dw-hidden-radio-pole", "dw-hidden-gate-pole", "dw-chest", "dw-logistic-input", "dw-logistic-output", "dw-pipe",
         "dw-stair-loader", "dw-stair-fast-loader", "dw-stair-express-loader"
@@ -24,25 +35,25 @@ local function reset_platforms(command)
     end
 
     -- recreate surface chests and links with factory
-    local factory_pole = storage.platform.factory.surface.find_entity("dw-hidden-gate-pole", {0, -6})
-    local pole = dw.platforms.create_special_entity(storage.warp.current.surface, dw.entities.surface_radio_pole)
+    local factory_pole = ctx.platform.factory.surface.find_entity("dw-hidden-gate-pole", {0, -6})
+    local pole = dw.platforms.create_special_entity(ctx.warp.current.surface, dw.entities.surface_radio_pole, false, force)
     if factory_pole and pole then utils.link_cables(factory_pole, pole, defines.wire_connectors.power) end
-    dw.logistics.create_loader_chest_pair(storage.warp.current.surface, storage.platform.factory.surface, dw.stairs.surface_factory)
-    dw.logistics.create_pipe_pairs(storage.warp.current.surface, storage.platform.factory.surface, dw.stairs.surface_factory)
+    dw.logistics.create_loader_chest_pair(force_name, ctx, ctx.warp.current.surface, ctx.platform.factory.surface, dw.stairs.surface_factory)
+    dw.logistics.create_pipe_pairs(force_name, ctx, ctx.warp.current.surface, ctx.platform.factory.surface, dw.stairs.surface_factory)
 
     -- recreate the mobile gate if it exists
-    if storage.warpgate.gate then
-        if storage.warpgate.mobile_gate and storage.warpgate.mobile_gate.valid then storage.warpgate.mobile_gate.destroy{raise_destroy=true} end
-        dw.gate.create_warpgate()
-        dw.gate.create_mobile_gate()
+    if ctx.warpgate.gate then
+        if ctx.warpgate.mobile_gate and ctx.warpgate.mobile_gate.valid then ctx.warpgate.mobile_gate.destroy{raise_destroy=true} end
+        dw.gate.create_warpgate(force_name, ctx)
+        dw.gate.create_mobile_gate(force_name, ctx)
     end
 end
 
-local function reset_harvester_side(side, entity_list)
-    local surface = storage.platform.mining.surface
-    local harvester_area = math2d.bounding_box.create_from_centre(dw.harvesters[side].center, storage.harvesters[side].size - 1)
+local function reset_harvester_side(force_name, ctx, side, entity_list)
+    local surface = ctx.platform.mining.surface
+    local harvester_area = math2d.bounding_box.create_from_centre(dw.harvesters[side].center, ctx.harvesters[side].size - 1)
 
-    dw.platforms.recall_harvester(side)
+    dw.platforms.recall_harvester(force_name, ctx, side)
 
     local entities = surface.find_entities_filtered{
         area = harvester_area,
@@ -52,12 +63,18 @@ local function reset_harvester_side(side, entity_list)
         entity.destroy()
     end
 
-    dw.platforms.create_harvester_zone(side)
-    dw.platforms.create_update_pipes_loaders(side)
+    dw.platforms.create_harvester_zone(force_name, ctx, side)
+    dw.platforms.create_update_pipes_loaders(force_name, ctx, side)
 end
 
 local function reset_harvesters(command)
-    if not storage.platform.mining.surface then return end
+    if not command.player_index then return end
+    local player = game.players[command.player_index]
+    if not (player and player.valid) then return end
+    local force_name = dw.effective_force(player)
+    if not (force_name and dw.has_warp_ctx(force_name)) then return end
+    local ctx = dw.warp_ctx(force_name)
+    if not ctx.platform.mining.surface then return end
 
     local entity_list = {
         "dw-hidden-radio-pole", "dw-hidden-gate-pole", "dw-chest", "dw-logistic-input", "dw-logistic-output", "dw-pipe",
@@ -78,8 +95,8 @@ local function reset_harvesters(command)
         table.insert(entity_list, 'harvest-superior-linked-belt')
     end
 
-    if storage.harvesters.left.gate then reset_harvester_side("left", entity_list) end
-    if storage.harvesters.right.gate then reset_harvester_side("right", entity_list) end
+    if ctx.harvesters.left.gate then reset_harvester_side(force_name, ctx, "left", entity_list) end
+    if ctx.harvesters.right.gate then reset_harvester_side(force_name, ctx, "right", entity_list) end
 end
 
 

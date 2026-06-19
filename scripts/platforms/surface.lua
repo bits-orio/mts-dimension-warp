@@ -269,48 +269,62 @@ local function teleport_platform(force_name, ctx)
 end
 dw.teleport_platform = teleport_platform
 
-local function relink_loader_chest(surface, positions_list)
+-- Re-find the warp-SIDE chest/loader handles (the 'surface' role bucket) after a
+-- platform clone invalidates their unit_numbers. The dimension-SIDE handles live
+-- on a surface that is never cloned, so they persist and must NOT be re-found.
+local function relink_loader_chest(ctx, surface, positions_list)
     for _, positions in pairs(positions_list) do
         local chest_index = 'surface_' .. positions.chests[1][1] .. '_' .. positions.chests[1][2]
         local loader_index = 'surface_' .. positions.loaders[1][1] .. '_' .. positions.loaders[1][2]
 
         --- if we didn't store any pair with that index, it means the chest/loader pair is not yet deployed
-        if not storage.stairs.chest_pairs[chest_index] then goto continue end
+        if not ctx.stairs.chest_pairs[chest_index] then goto continue end
 
         local chest = surface.find_entities_filtered{position = positions.chests[1], name = {"dw-chest", "dw-logistic-input", "dw-logistic-output"}}
-        local loader = surface.find_entities_filtered{position = positions.loaders[1], name = {storage.stairs.loader_tier}}
+        local loader = surface.find_entities_filtered{position = positions.loaders[1], name = {ctx.stairs.loader_tier}}
 
         if chest[1] and loader[1] then
-            storage.stairs.chest_pairs[chest_index].A = chest[1]
-            storage.stairs.chest_loader_pairs.surface[loader_index].loader = loader[1]
-            storage.stairs.chest_loader_pairs.surface[loader_index].chest = chest[1]
+            -- Re-find the warp-side chest unconditionally (the item-flow-critical
+            -- handle); only the loader-bucket update needs the existence guard
+            -- (the bucket entry is created alongside the chest_pair, so it is
+            -- normally present -- the guard just avoids a nil-index in the rare
+            -- case it isn't).
+            ctx.stairs.chest_pairs[chest_index].A = chest[1]
+            local lp = ctx.stairs.chest_loader_pairs.surface[loader_index]
+            if lp then
+                lp.loader = loader[1]
+                lp.chest = chest[1]
+            end
         end
         ::continue::
     end
 end
 
-local function relink_pipes(surface, positions_list)
+local function relink_pipes(ctx, surface, positions_list)
     for _, positions in pairs(positions_list) do
         local index = 'surface_' .. positions.pipes[1][1] .. '_' .. positions.pipes[1][2]
 
         --- if we didn't store any pair with that index, it means the pipe pair is not yet deployed
-        if not storage.stairs.pipe_pairs[index] then goto continue end
+        if not ctx.stairs.pipe_pairs[index] then goto continue end
 
-        local pipe = surface.find_entities_filtered{position = positions.pipes[1], name = {storage.stairs.pipes_type}}
+        local pipe = surface.find_entities_filtered{position = positions.pipes[1], name = {ctx.stairs.pipes_type}}
 
-        if pipe[1] then
-            storage.stairs.pipe_pairs[index].A = pipe[1]
-            pipe[1].fluidbox.add_linked_connection(0, storage.stairs.pipe_pairs[index].B, 0)
+        if pipe[1] and ctx.stairs.pipe_pairs[index].B and ctx.stairs.pipe_pairs[index].B.valid then
+            ctx.stairs.pipe_pairs[index].A = pipe[1]
+            pipe[1].fluidbox.add_linked_connection(0, ctx.stairs.pipe_pairs[index].B, 0)
         end
         ::continue::
     end
 end
 
---- force update some entities that may be broken due to clone
---- and the fact surfaces are not linked to planet asoon as they are created
-dw.platform_force_update_entities = function()
-    local surface = storage.warp.current.surface
-    local platform = math2d.bounding_box.create_from_centre({0, 0}, storage.platform.warp.size, storage.platform.warp.size)
+--- force update some entities that may be broken due to clone (new unit_numbers)
+--- and the fact surfaces are not linked to planet as soon as they are created.
+--- Called per-team from the warp loop after each Arrive. Re-finds ONLY the warp-
+--- side handles; dimension-side handles are on un-cloned surfaces and persist.
+dw.platform_force_update_entities = function(force_name, ctx)
+    local surface = ctx.warp.current.surface
+    if not (surface and surface.valid) then return end
+    local platform = math2d.bounding_box.create_from_centre({0, 0}, ctx.platform.warp.size, ctx.platform.warp.size)
 
     --- delete corpses
     local corpses = surface.find_entities_filtered({area = platform, type="corpse"})
@@ -331,39 +345,39 @@ dw.platform_force_update_entities = function()
 
     --- update teleporters (radio station + warpgate)
     local radio_tower = surface.find_entity(dw.entities.surface_radio_station.name, dw.entities.surface_radio_station.position)
-    if radio_tower then
-        utils.link_gates('factory-to-warp', 'warp-to-factory', storage.teleporter['factory-to-warp'].from, radio_tower)
-        utils.link_cables(storage.teleporter['factory-to-warp'].from, radio_tower, defines.wire_connectors.logic)
+    if radio_tower and ctx.teleporter['factory-to-warp'] and ctx.teleporter['factory-to-warp'].from then
+        utils.link_gates(ctx, 'factory-to-warp', 'warp-to-factory', ctx.teleporter['factory-to-warp'].from, radio_tower)
+        utils.link_cables(ctx.teleporter['factory-to-warp'].from, radio_tower, defines.wire_connectors.logic)
     end
 
     --- update electricity link
     local surface_radio_pole = surface.find_entity(dw.entities.surface_radio_pole.name, dw.entities.surface_radio_pole.position)
-    if storage.platform.factory.surface then
-        local factory_power_pole = storage.platform.factory.surface.find_entity(dw.entities.pole_factory_surface.name, dw.entities.pole_factory_surface.position)
+    if ctx.platform.factory.surface and ctx.platform.factory.surface.valid then
+        local factory_power_pole = ctx.platform.factory.surface.find_entity(dw.entities.pole_factory_surface.name, dw.entities.pole_factory_surface.position)
         if surface_radio_pole and factory_power_pole then
             utils.link_cables(surface_radio_pole, factory_power_pole, defines.wire_connectors.power)
         end
     end
 
     --- relink loaders/chests between surfaces
-    relink_loader_chest(surface, dw.stairs.surface_factory)
-    relink_pipes(surface, dw.stairs.surface_factory)
+    relink_loader_chest(ctx, surface, dw.stairs.surface_factory)
+    relink_pipes(ctx, surface, dw.stairs.surface_factory)
 
     --- recreate and relink mobile gate
-    if storage.warpgate.gate then
+    if ctx.warpgate.gate then
         local warp_gate = surface.find_entity(dw.warp_gate.name, dw.warp_gate.position)
         if warp_gate then
-            storage.warpgate.gate = warp_gate
-            storage.warpgate.mobile_gate = nil
-            dw.gate.create_mobile_gate()
-            dw.gate.link_warp_gate(nil, nil, nil, true)
+            ctx.warpgate.gate = warp_gate
+            ctx.warpgate.mobile_gate = nil
+            dw.gate.create_mobile_gate(force_name, ctx)
+            dw.gate.link_warp_gate(force_name, ctx, nil, nil, nil, true)
         end
         -- relink power pole
         local pole = surface.find_entity("dw-hidden-gate-pole", dw.warp_gate.position)
         if pole and surface_radio_pole then
             utils.link_cables(surface_radio_pole, pole, defines.wire_connectors.power)
         end
-        storage.warpgate.gatepole = pole
+        ctx.warpgate.gatepole = pole
     end
 end
 
@@ -388,13 +402,24 @@ local function on_technology_research_finished(event)
             tech.level, force.name, ctx.platform.warp.size)
     end
 
-    -- platform-radar: DEFERRED AUX. The factory/mining/power platforms and the
-    -- surface radio station are Phase-4 aux subsystems not yet in the per-team
-    -- model, so ctx has no .platform.{factory,mining,power}.surface to wire a
-    -- hidden radar onto. Left as an explicit no-op -- the old flat-global body
-    -- (storage.warp.current.surface / storage.platform.*.surface) would crash on
-    -- the per-team path. Re-enable when those aux platforms land.
-    -- if string.match(tech.name, "platform%-radar") then ... end
+    -- platform-radar (re-enabled in P4/S7 now the aux platforms are per-team):
+    -- wake the surface radio station and drop a hidden radar on each dimension
+    -- platform the team owns. Guarded per surface so a team that hasn't unlocked
+    -- a given platform is simply skipped.
+    if string.match(tech.name, "platform%-radar") then
+        local radio_tower = ctx.warp.current.surface
+            and ctx.warp.current.surface.find_entity(dw.entities.surface_radio_station.name, dw.entities.surface_radio_station.position)
+        if radio_tower then
+            radio_tower.active = true
+        end
+        for _, role in ipairs({"factory", "mining", "power"}) do
+            local s = ctx.platform[role].surface
+            if s and s.valid then
+                local radar = s.create_entity{name = "dw-hidden-radar", force = force, position = {0, 0}}
+                radar.destructible = false
+            end
+        end
+    end
 end
 
 

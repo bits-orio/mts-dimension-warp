@@ -102,9 +102,13 @@ function utils.put_warning_tiles(surface, template)
 end
 
 
-function utils.link_gates(teleport_connection1, teleport_connection2, teleport1, teleport2)
-    storage.teleporter[teleport_connection1] = {active = true, from = teleport1, to = teleport2}
-    storage.teleporter[teleport_connection2] = {active = true, from = teleport2, to = teleport1}
+-- Write a bidirectional teleport route into the OWNING TEAM's ctx.teleporter.
+-- Upstream wrote the flat storage.teleporter, which the ported teleport.lua no
+-- longer reads -- so until this is ctx-threaded the routes are dead. ctx is the
+-- team that owns both gates (they always sit on that team's own surfaces).
+function utils.link_gates(ctx, teleport_connection1, teleport_connection2, teleport1, teleport2)
+    ctx.teleporter[teleport_connection1] = {active = true, from = teleport1, to = teleport2}
+    ctx.teleporter[teleport_connection2] = {active = true, from = teleport2, to = teleport1}
 end
 
 function utils.link_cables(entity1, entity2, wire_connectors)
@@ -139,16 +143,19 @@ function utils.spill_or_return_item(event)
     end
 end
 
----Check that we construct entity only on surface, not any platform.
----If we do, destroy and return the item.
+---Check that an entity is built on a surface of the allowed ROLE for its owning
+---team, destroying + returning the item otherwise. Upstream keyed allowed
+---surfaces by NAME ({produstia=true} / {[warp.current.name]=true}), which breaks
+---under per-team unique names; we resolve the surface's role via dw.surface_role.
 ---@param event EventData.on_built_entity|EventData.on_robot_built_entity the event data
----@param allowed_surfaces table<string,boolean> the surface list, key must be surface name with true if allowed
+---@param ctx table|nil the owning team's warp context (nil => surface not team-owned)
+---@param allowed_role string 'surface' (the warp surface) / 'factory' / 'mining' / 'power'
 ---@param localized_message string the localized message
 ---@return boolean # true if the surface is allowed
-function utils.entity_built_surface_check(event, allowed_surfaces, localized_message)
+function utils.entity_built_surface_check(event, ctx, allowed_role, localized_message)
     local entity = event.entity
 
-    if allowed_surfaces[entity.surface.name] then return true end
+    if ctx and dw.surface_role(ctx, entity.surface) == allowed_role then return true end
     utils.spill_or_return_item(event)
     utils.create_flying_text{
         position = entity.position,
@@ -191,25 +198,29 @@ function utils.adjust_resource_proportion(mapgen, resource_list, main_resource, 
 end
 
 
-function utils.check_deployable_collision(box, source)
-    if source ~= defines.deployable_collision_source.left_harvester and storage.harvesters.left.deployed then
-        if math2d.bounding_box.collides_with(box, storage.harvesters.left.area) then
+-- Does a candidate placement box collide with one of THIS team's existing
+-- deployables (the other harvester, the mobile gate) or its warp platform?
+-- ctx scopes the check to the acting team so one team's harvester can't be
+-- blocked by another team's.
+function utils.check_deployable_collision(ctx, box, source)
+    if source ~= defines.deployable_collision_source.left_harvester and ctx.harvesters.left.deployed then
+        if math2d.bounding_box.collides_with(box, ctx.harvesters.left.area) then
             return true
         end
     end
-    if source ~= defines.deployable_collision_source.right_harvester and storage.harvesters.right.deployed then
-        if math2d.bounding_box.collides_with(box, storage.harvesters.right.area) then
+    if source ~= defines.deployable_collision_source.right_harvester and ctx.harvesters.right.deployed then
+        if math2d.bounding_box.collides_with(box, ctx.harvesters.right.area) then
             return true
         end
     end
     if source ~= defines.deployable_collision_source.mobile_gate then
-        if storage.warpgate.mobile_gate and storage.warpgate.mobile_gate.valid then
-            local area_to_check = math2d.bounding_box.create_from_centre({storage.warpgate.mobile_gate.position.x, storage.warpgate.mobile_gate.position.y + 0.5}, 10, 2)
+        if ctx.warpgate.mobile_gate and ctx.warpgate.mobile_gate.valid then
+            local area_to_check = math2d.bounding_box.create_from_centre({ctx.warpgate.mobile_gate.position.x, ctx.warpgate.mobile_gate.position.y + 0.5}, 10, 2)
             if math2d.bounding_box.collides_with(box, area_to_check) then
                 return true
             end
         end
-        local platform_area = math2d.bounding_box.create_from_centre({0, 0}, storage.platform.warp.size, storage.platform.warp.size)
+        local platform_area = math2d.bounding_box.create_from_centre({0, 0}, ctx.platform.warp.size, ctx.platform.warp.size)
         if math2d.bounding_box.collides_with(box, platform_area) then
             return true
         end

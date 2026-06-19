@@ -1,13 +1,22 @@
 dw.logistics = dw.logistics or {}
 
+-- PORTED to per-team ctx (P4/S3). Upstream keyed the chest/loader buckets by bare
+-- surface NAME via dw.safe_surfaces[surface.name]; under MTS each team's surfaces
+-- have unique names (mdw-team-1-factory), so every surface collapsed to "surface"
+-- and the indices collided. We key by the per-team ROLE token from
+-- dw.surface_role(ctx, surface) instead ('surface'/'factory'/'mining'/'power';
+-- the 'gate' bucket is a literal owned by warpgate.lua). All state moves from the
+-- flat storage.stairs to ctx.stairs, and entities belong to the team force.
+
 --- surface A should always be first surface in dw.stairs index name.
 --- surface B should always be second surface in dw.stairs index name.
 --- in the case of the surface mobile gate, A = platform, B = anywhere.
-local function create_loader_chest_pair(surface_A, surface_B, positions)
-    local surface_name_A = dw.safe_surfaces[surface_A.name] and surface_A.name or "surface"
-    local surface_name_B = dw.safe_surfaces[surface_B.name] and surface_B.name or "surface"
+local function create_loader_chest_pair(force_name, ctx, surface_A, surface_B, positions)
+    local surface_name_A = dw.surface_role(ctx, surface_A)
+    local surface_name_B = dw.surface_role(ctx, surface_B)
+    local force = game.forces[force_name]
 
-    local max = math.min(#positions, storage.stairs.chest_number)
+    local max = math.min(#positions, ctx.stairs.chest_number)
     for i = 1, max, 1 do
         local chest_index = surface_name_A .. '_' .. positions[i].chests[1][1] .. '_' .. positions[i].chests[1][2]
         local loader_index_A = surface_name_A .. '_' .. positions[i].loaders[1][1] .. '_' .. positions[i].loaders[1][2]
@@ -18,16 +27,16 @@ local function create_loader_chest_pair(surface_A, surface_B, positions)
         local loader_B = nil
         local type = defines.item_direction.push
 
-        if storage.stairs.chest_pairs[chest_index] then
-            chest_A = storage.stairs.chest_pairs[chest_index].A
-            chest_B = storage.stairs.chest_pairs[chest_index].B
-            type = storage.stairs.chest_pairs[chest_index].type
+        if ctx.stairs.chest_pairs[chest_index] then
+            chest_A = ctx.stairs.chest_pairs[chest_index].A
+            chest_B = ctx.stairs.chest_pairs[chest_index].B
+            type = ctx.stairs.chest_pairs[chest_index].type
         end
-        if storage.stairs.chest_loader_pairs[surface_name_A][loader_index_A] then
-            loader_A = storage.stairs.chest_loader_pairs[surface_name_A][loader_index_A].loader
+        if ctx.stairs.chest_loader_pairs[surface_name_A][loader_index_A] then
+            loader_A = ctx.stairs.chest_loader_pairs[surface_name_A][loader_index_A].loader
         end
-        if storage.stairs.chest_loader_pairs[surface_name_B][loader_index_B] then
-            loader_B = storage.stairs.chest_loader_pairs[surface_name_B][loader_index_B].loader
+        if ctx.stairs.chest_loader_pairs[surface_name_B][loader_index_B] then
+            loader_B = ctx.stairs.chest_loader_pairs[surface_name_B][loader_index_B].loader
         end
 
         --- if the chest is not valid or doesn't exist, we create it
@@ -35,9 +44,9 @@ local function create_loader_chest_pair(surface_A, surface_B, positions)
             local to_remove = surface_A.find_entities_filtered {position = positions[i].chests[1], type = {"character", "rocket-silo-rocket", "cargo-pod"}, invert = true}
             for _, entity in pairs(to_remove) do entity.destroy() end
             chest_A = surface_A.create_entity {
-                name = (type == defines.item_direction.push) and storage.stairs.chest_type.input or storage.stairs.chest_type.output,
+                name = (type == defines.item_direction.push) and ctx.stairs.chest_type.input or ctx.stairs.chest_type.output,
                 position = positions[i].chests[1],
-                force = game.forces.player,
+                force = force,
                 direction = defines.direction.north
             }
             chest_A.destructible = false
@@ -48,16 +57,16 @@ local function create_loader_chest_pair(surface_A, surface_B, positions)
             local to_remove = surface_B.find_entities_filtered {position = positions[i].chests[2], type = {"character", "rocket-silo-rocket", "cargo-pod"}, invert = true}
             for _, entity in pairs(to_remove) do entity.destroy() end
             chest_B = surface_B.create_entity {
-                name = (type == defines.item_direction.push) and storage.stairs.chest_type.output or storage.stairs.chest_type.input,
+                name = (type == defines.item_direction.push) and ctx.stairs.chest_type.output or ctx.stairs.chest_type.input,
                 position = positions[i].chests[2],
-                force = game.forces.player,
+                force = force,
                 direction = defines.direction.north
             }
             chest_B.destructible = false
         end
 
         --- pair both chest and provide the type of flow.
-        storage.stairs.chest_pairs[chest_index] = {
+        ctx.stairs.chest_pairs[chest_index] = {
             A = chest_A,
             B = chest_B,
             type = type,
@@ -69,9 +78,9 @@ local function create_loader_chest_pair(surface_A, surface_B, positions)
             for _, entity in pairs(to_remove) do entity.destroy() end
             local loader_type = (type == defines.item_direction.push) and "input" or "output"
             loader_A = surface_A.create_entity {
-                name = storage.stairs.loader_tier,
+                name = ctx.stairs.loader_tier,
                 position = positions[i].loaders[1],
-                force = game.forces.player,
+                force = force,
                 direction = positions[i].direction[1][loader_type],
                 type = loader_type
             }
@@ -83,9 +92,9 @@ local function create_loader_chest_pair(surface_A, surface_B, positions)
             for _, entity in pairs(to_remove) do entity.destroy() end
             local loader_type = (type == defines.item_direction.push) and "output" or "input"
             loader_B = surface_B.create_entity {
-                name = storage.stairs.loader_tier,
+                name = ctx.stairs.loader_tier,
                 position = positions[i].loaders[2],
-                force = game.forces.player,
+                force = force,
                 direction = positions[i].direction[2][loader_type],
                 type = loader_type,
             }
@@ -94,13 +103,13 @@ local function create_loader_chest_pair(surface_A, surface_B, positions)
 
         --- we store each pair (chest/loader) and save the ref to find the linked pair
         --- this is used for post warp check / rotation of loaders to change flow direction
-        storage.stairs.chest_loader_pairs[surface_name_A][loader_index_A] = {
+        ctx.stairs.chest_loader_pairs[surface_name_A][loader_index_A] = {
             loader = loader_A,
             chest = chest_A,
             type = (type == defines.item_direction.push) and "input" or "output",
             ref = {surface_name_B, loader_index_B}
         }
-        storage.stairs.chest_loader_pairs[surface_name_B][loader_index_B] = {
+        ctx.stairs.chest_loader_pairs[surface_name_B][loader_index_B] = {
             loader = loader_B,
             chest = chest_B,
             type = (type == defines.item_direction.push) and "output" or "input",
@@ -113,22 +122,23 @@ dw.logistics.create_loader_chest_pair = create_loader_chest_pair
 --- surface A should always be first surface in dw.stairs index name.
 --- surface B should always be second surface in dw.stairs index name.
 --- order matters as it's used for the storage
-local function create_pipe_pairs(surface_A, surface_B, positions)
-    local surface_name_A = dw.safe_surfaces[surface_A.name] and surface_A.name or "surface"
+local function create_pipe_pairs(force_name, ctx, surface_A, surface_B, positions)
+    local surface_name_A = dw.surface_role(ctx, surface_A)
+    local force = game.forces[force_name]
 
-    local max = math.min(#positions, storage.stairs.chest_number)
+    local max = math.min(#positions, ctx.stairs.chest_number)
     for i = 1, max, 1 do
         local pipe_index = surface_name_A .. '_' .. positions[i].pipes[1][1] .. '_' .. positions[i].pipes[1][2]
 
-        if storage.stairs.pipe_pairs[pipe_index] and storage.stairs.pipe_pairs[pipe_index].valid then goto continue end
+        if ctx.stairs.pipe_pairs[pipe_index] and ctx.stairs.pipe_pairs[pipe_index].valid then goto continue end
 
         --- destroy what's existing in pipe position
         local to_remove = surface_A.find_entities_filtered {position = positions[i].pipes[1], type = {"character", "rocket-silo-rocket", "cargo-pod"}, invert = true}
         for _, entity in pairs(to_remove) do entity.destroy() end
         local pipe_A = surface_A.create_entity {
-            name = storage.stairs.pipes_type,
+            name = ctx.stairs.pipes_type,
             position = positions[i].pipes[1],
-            force = game.forces.player,
+            force = force,
             direction = (i % 2 == 0) and defines.direction.east or defines.direction.west,
         }
         pipe_A.destructible = false
@@ -136,45 +146,47 @@ local function create_pipe_pairs(surface_A, surface_B, positions)
         local to_remove = surface_B.find_entities_filtered {position = positions[i].pipes[2], type = {"character", "rocket-silo-rocket", "cargo-pod"}, invert = true}
         for _, entity in pairs(to_remove) do entity.destroy() end
         local pipe_B = surface_B.create_entity {
-            name = storage.stairs.pipes_type,
+            name = ctx.stairs.pipes_type,
             position = positions[i].pipes[2],
-            force = game.forces.player,
+            force = force,
             direction = (i % 2 == 0) and defines.direction.east or defines.direction.west,
         }
         pipe_B.destructible = false
 
         pipe_A.fluidbox.add_linked_connection(0, pipe_B, 0)
-        storage.stairs.pipe_pairs[pipe_index] = {A = pipe_A, B = pipe_B}
+        ctx.stairs.pipe_pairs[pipe_index] = {A = pipe_A, B = pipe_B}
         ::continue::
     end
 end
 dw.logistics.create_pipe_pairs = create_pipe_pairs
 
-local function upgrade_stairs()
-    for surface_name, loader_pair in pairs(storage.stairs.chest_loader_pairs) do
+local function upgrade_stairs(force_name, ctx)
+    local force = game.forces[force_name]
+    for surface_name, loader_pair in pairs(ctx.stairs.chest_loader_pairs) do
         for index, stairs in pairs(loader_pair) do
             local loader = stairs.loader
             if not loader or not loader.valid then goto continue end
             local surface = stairs.loader.surface
 
             local new_loader = surface.create_entity{
-                name = storage.stairs.loader_tier,
+                name = ctx.stairs.loader_tier,
                 position = loader.position,
-                force = game.forces.player,
+                force = force,
                 direction = loader.direction,
                 type = loader.loader_type,
                 fast_replace = true,
             }
             new_loader.destructible = false
-            storage.stairs.chest_loader_pairs[surface_name][index].loader = new_loader
+            ctx.stairs.chest_loader_pairs[surface_name][index].loader = new_loader
 
             ::continue::
         end
     end
 end
 
-local function update_chests()
-    for surface_name, loader_pair in pairs(storage.stairs.chest_loader_pairs) do
+local function update_chests(force_name, ctx)
+    local force = game.forces[force_name]
+    for surface_name, loader_pair in pairs(ctx.stairs.chest_loader_pairs) do
         for index, stairs in pairs(loader_pair) do
             local chest = stairs.chest
             if not chest or not chest.valid then goto continue end
@@ -184,33 +196,33 @@ local function update_chests()
             local chest_index = surface_name .. '_' .. chest.position.x .. '_' .. chest.position.y
             local chest_pair_index = "A"
             local chest_name = ""
-            if not storage.stairs.chest_pairs[chest_index] then
+            if not ctx.stairs.chest_pairs[chest_index] then
                 -- the current pair is not the "A" chest, so check from the pair ref
-                local pair_chest = storage.stairs.chest_loader_pairs[stairs.ref[1]][stairs.ref[2]].chest
-                local chest_surface_name = pair_chest.surface.name
-                chest_surface_name = dw.safe_surfaces[chest_surface_name] and chest_surface_name or (surface_name == "gate" and surface_name) or "surface"
+                local pair_chest = ctx.stairs.chest_loader_pairs[stairs.ref[1]][stairs.ref[2]].chest
+                local chest_surface_name = dw.surface_role(ctx, pair_chest.surface)
+                if chest_surface_name == "surface" and surface_name == "gate" then chest_surface_name = "gate" end
                 chest_index = chest_surface_name .. '_' .. pair_chest.position.x .. '_' .. pair_chest.position.y
                 chest_pair_index = "B"
 
                 -- here it means we are the "destination" of the item direction, so we need to inverse the chest type
-                local chest_type = storage.stairs.chest_pairs[chest_index].type
-                chest_name = (chest_type == defines.item_direction.push) and storage.stairs.chest_type.output or storage.stairs.chest_type.input
+                local chest_type = ctx.stairs.chest_pairs[chest_index].type
+                chest_name = (chest_type == defines.item_direction.push) and ctx.stairs.chest_type.output or ctx.stairs.chest_type.input
             else
-                local chest_type = storage.stairs.chest_pairs[chest_index].type
-                chest_name = (chest_type == defines.item_direction.push) and storage.stairs.chest_type.input or storage.stairs.chest_type.output
+                local chest_type = ctx.stairs.chest_pairs[chest_index].type
+                chest_name = (chest_type == defines.item_direction.push) and ctx.stairs.chest_type.input or ctx.stairs.chest_type.output
             end
 
             -- upgrade the chest and store it in the globals
             local new_chest = surface.create_entity{
                 name = chest_name,
                 position = chest.position,
-                force = game.forces.player,
+                force = force,
                 direction = chest.direction,
                 fast_replace = true,
             }
             new_chest.destructible = false
-            storage.stairs.chest_loader_pairs[surface_name][index].chest = new_chest
-            storage.stairs.chest_pairs[chest_index][chest_pair_index] = new_chest
+            ctx.stairs.chest_loader_pairs[surface_name][index].chest = new_chest
+            ctx.stairs.chest_pairs[chest_index][chest_pair_index] = new_chest
 
             ::continue::
         end
@@ -218,43 +230,54 @@ local function update_chests()
 end
 
 local function on_technology_research_finished(event)
+    local force = event.research.force
+    if not force.name:find("^team%-") then return end
+    if not dw.has_warp_ctx(force.name) then return end
+    local force_name = force.name
+    local ctx = dw.warp_ctx(force_name)
     local tech = event.research
 
     if string.match(tech.name, "dw%-.*%-loader%-stairs") then
         local loader = string.match(tech.name, "dw%-(.*)%-stairs")
         if loader then
-            storage.stairs.loader_tier = "dw-stair-" .. loader
-            upgrade_stairs()
+            ctx.stairs.loader_tier = "dw-stair-" .. loader
+            upgrade_stairs(force_name, ctx)
         end
     end
 
     if string.match(tech.name, "dw%-number%-stairs%-.*") then
-        storage.stairs.chest_number = storage.stairs.chest_number + 2
-        if storage.platform.factory.surface and storage.platform.mining.surface then
-            create_loader_chest_pair(storage.platform.factory.surface, storage.platform.mining.surface, dw.stairs.factory_mining)
-            create_pipe_pairs(storage.platform.factory.surface, storage.platform.mining.surface, dw.stairs.factory_mining)
+        ctx.stairs.chest_number = ctx.stairs.chest_number + 2
+        if ctx.platform.factory.surface and ctx.platform.mining.surface then
+            create_loader_chest_pair(force_name, ctx, ctx.platform.factory.surface, ctx.platform.mining.surface, dw.stairs.factory_mining)
+            create_pipe_pairs(force_name, ctx, ctx.platform.factory.surface, ctx.platform.mining.surface, dw.stairs.factory_mining)
         end
-        if storage.platform.power.surface and storage.platform.mining.surface then
-            create_loader_chest_pair(storage.platform.mining.surface, storage.platform.power.surface, dw.stairs.mining_power)
-            create_pipe_pairs(storage.platform.mining.surface, storage.platform.power.surface, dw.stairs.mining_power)
+        if ctx.platform.power.surface and ctx.platform.mining.surface then
+            create_loader_chest_pair(force_name, ctx, ctx.platform.mining.surface, ctx.platform.power.surface, dw.stairs.mining_power)
+            create_pipe_pairs(force_name, ctx, ctx.platform.mining.surface, ctx.platform.power.surface, dw.stairs.mining_power)
         end
-        if storage.platform.factory.surface then
-            create_loader_chest_pair(storage.warp.current.surface, storage.platform.factory.surface, dw.stairs.surface_factory)
-            create_pipe_pairs(storage.warp.current.surface, storage.platform.factory.surface, dw.stairs.surface_factory)
+        -- surface_factory pairs link the WARP surface to the factory; guard BOTH
+        -- (the factory guard alone left ctx.warp.current.surface an unchecked deref).
+        if ctx.platform.factory.surface and ctx.platform.factory.surface.valid
+            and ctx.warp.current.surface and ctx.warp.current.surface.valid then
+            create_loader_chest_pair(force_name, ctx, ctx.warp.current.surface, ctx.platform.factory.surface, dw.stairs.surface_factory)
+            create_pipe_pairs(force_name, ctx, ctx.warp.current.surface, ctx.platform.factory.surface, dw.stairs.surface_factory)
         end
     end
 
     if string.match(tech.name, "dw%-stair%-logistic%-chest") then
-        storage.stairs.chest_type.input = "dw-logistic-input"
-        storage.stairs.chest_type.output = "dw-logistic-output"
-        update_chests()
+        ctx.stairs.chest_type.input = "dw-logistic-input"
+        ctx.stairs.chest_type.output = "dw-logistic-output"
+        update_chests(force_name, ctx)
     end
 end
 
 
 
-local function move_chest_items()
-    for k, chest_pair in pairs(storage.stairs.chest_pairs) do
+--- Shuttle items across every chest pair of ONE team. Driven per-team via
+--- register_team_tick(5) (upstream was a single global on_nth_tick_5 over the
+--- flat chest_pairs).
+local function move_chest_items(force_name, ctx)
+    for k, chest_pair in pairs(ctx.stairs.chest_pairs) do
         local chest_A = chest_pair.A
         local chest_B = chest_pair.B
         if chest_A and chest_B and chest_A.valid and chest_B.valid then
@@ -272,16 +295,22 @@ end
 local function invert_chest_flow(event)
     local entity = event.entity
     if string.match(entity.name, "dw%-stair%-loader") or string.match(entity.name, "dw%-stair%-%a+%-loader") then
-        local surface_name = dw.safe_surfaces[entity.surface.name] and entity.surface.name or "surface"
+        -- Resolve the team that owns the surface the loader sits on. A loader on a
+        -- non-team surface (no owner) is not ours -- no-op.
+        local owner = dw.surface_owner(entity.surface.index)
+        if not owner then return end
+        local ctx = dw.warp_ctx(owner)
+
+        local surface_name = dw.surface_role(ctx, entity.surface)
         local index = surface_name .. '_' .. entity.position.x .. '_' .. entity.position.y
-        if surface_name == "surface" and not storage.stairs.chest_loader_pairs[surface_name][index] then
+        if surface_name == "surface" and not ctx.stairs.chest_loader_pairs[surface_name][index] then
             surface_name = "gate"
             index = surface_name .. '_' .. entity.position.x .. '_' .. entity.position.y
         end
 
-        if storage.stairs.chest_loader_pairs[surface_name][index] then
-            local pair_A = storage.stairs.chest_loader_pairs[surface_name][index]
-            local pair_B = storage.stairs.chest_loader_pairs[pair_A.ref[1]][pair_A.ref[2]]
+        if ctx.stairs.chest_loader_pairs[surface_name][index] then
+            local pair_A = ctx.stairs.chest_loader_pairs[surface_name][index]
+            local pair_B = ctx.stairs.chest_loader_pairs[pair_A.ref[1]][pair_A.ref[2]]
 
             --- invert loaders (we don't need to invert loaderA as the event is triggered by it already)
             if pair_A and pair_A.loader and pair_A.loader.valid then
@@ -294,7 +323,7 @@ local function invert_chest_flow(event)
 
             --- chest invertion, only do something if we have logistic chests
             if pair_A and pair_A.chest and pair_A.chest.name ~= "dw-chest" then
-                local chest_type = (pair_A.type == "input") and storage.stairs.chest_type.input or storage.stairs.chest_type.output
+                local chest_type = (pair_A.type == "input") and ctx.stairs.chest_type.input or ctx.stairs.chest_type.output
                 local chest_A = pair_A.chest.surface.create_entity {
                     name = chest_type,
                     position = pair_A.chest.position,
@@ -305,7 +334,7 @@ local function invert_chest_flow(event)
                 pair_A.chest = chest_A
 
                 if pair_B and pair_B.chest then
-                    local chest_type = (pair_B.type == "input") and storage.stairs.chest_type.input or storage.stairs.chest_type.output
+                    local chest_type = (pair_B.type == "input") and ctx.stairs.chest_type.input or ctx.stairs.chest_type.output
                     local chest_B = pair_B.chest.surface.create_entity {
                         name = chest_type,
                         position = pair_B.chest.position,
@@ -319,8 +348,8 @@ local function invert_chest_flow(event)
 
             --- find the corresponding chest pair
             local chest_index = surface_name .. '_' .. pair_A.chest.position.x .. '_' .. pair_A.chest.position.y
-            if storage.stairs.chest_pairs[chest_index] then
-                storage.stairs.chest_pairs[chest_index] = {
+            if ctx.stairs.chest_pairs[chest_index] then
+                ctx.stairs.chest_pairs[chest_index] = {
                     A = pair_A.chest,
                     B = pair_B and pair_B.chest or nil,
                     type = (pair_A.type == "input") and defines.item_direction.push or defines.item_direction.pull,
@@ -328,8 +357,8 @@ local function invert_chest_flow(event)
             else
                 local surface_name_B = pair_A.ref[1]
                 local chest_index = surface_name_B .. '_' .. pair_B.chest.position.x .. '_' .. pair_B.chest.position.y
-                if storage.stairs.chest_pairs[chest_index] then
-                    storage.stairs.chest_pairs[chest_index] = {
+                if ctx.stairs.chest_pairs[chest_index] then
+                    ctx.stairs.chest_pairs[chest_index] = {
                         A = pair_B.chest,
                         B = pair_A.chest,
                         type = (pair_B.type == "input") and defines.item_direction.push or defines.item_direction.pull,
@@ -342,5 +371,5 @@ end
 
 
 dw.register_event(defines.events.on_research_finished, on_technology_research_finished)
-dw.register_event("on_nth_tick_5", move_chest_items)
+dw.register_team_tick(5, move_chest_items)
 dw.register_event(defines.events.on_player_rotated_entity, invert_chest_flow)

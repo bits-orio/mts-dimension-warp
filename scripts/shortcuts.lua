@@ -12,23 +12,29 @@ local function dw_shortcuts(event)
     if not allowed_shortcuts[shortcut] then return end
     if player.controller_type ~= defines.controllers.character then return end
 
+    -- Resolve the player's team (spectator-aware) so the shortcut hands out THAT
+    -- team's current gate/harvester item. No team -> nothing to give.
+    local force_name = dw.effective_force(player)
+    if not (force_name and dw.has_warp_ctx(force_name)) then return end
+    local ctx = dw.warp_ctx(force_name)
+
     -- if the player already has one, we remove it, otherwise we put it in the hands
     local item_match = ""
     local item_name = nil
 
     if shortcut == "warp-gate-shortcut" then
         item_match = "mobile%-gate%-%d+"
-        item_name = storage.warpgate.mobile_type
+        item_name = ctx.warpgate.mobile_type
     end
 
     if shortcut == "harvester-left-shortcut" then
         item_match = "harvester%-left%-grid%-%d+"
-        item_name = storage.harvesters.left.mobile_name
+        item_name = ctx.harvesters.left.mobile_name
     end
 
     if shortcut == "harvester-right-shortcut" then
         item_match = "harvester%-right%-grid%-%d+"
-        item_name = storage.harvesters.right.mobile_name
+        item_name = ctx.harvesters.right.mobile_name
     end
 
     if player.cursor_stack and player.cursor_stack.valid_for_read and player.cursor_stack.name:match(item_match) then

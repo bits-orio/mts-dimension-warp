@@ -1,5 +1,12 @@
 if not script.active_mods['space-age'] then return end
 
+-- PORTED to per-team ctx (P4/S7). Yumako/jellynut cranes the team builds on its
+-- WARP surface, feeding fruit/seed chests on the team's MINING dimension platform.
+-- All flat storage.agricultural / storage.platform.mining state moves to ctx;
+-- entities belong to the team force. move_crane_items runs per-team via a team
+-- tick; crane_built resolves the team from the surface owner, research from
+-- event.research.force.
+
 local function transfer_seeds(from_inventory, to_inventory, name, quantity)
     for i = 1, #from_inventory do
         if quantity <= 0 then return end
@@ -24,6 +31,7 @@ local function transfer_seeds(from_inventory, to_inventory, name, quantity)
 end
 
 local function transfer_seeds_fruits(towers, seed_chest, fruit_chest, seed_name)
+    if not (seed_chest and seed_chest.valid and fruit_chest and fruit_chest.valid) then return end
     for index = #towers, 1, -1 do
         local tower = towers[index]
         if not tower.valid then
@@ -49,18 +57,26 @@ local function crane_built(event)
     local crane = event.entity
     if not crane.valid then return end
     if not string.match(crane.name, "dimension%-crane%-%a+") then return end
-    if not utils.entity_built_surface_check(event, {[storage.warp.current.name]=true}, "dw-messages.cannot-build-crane") then return end
 
-    if crane.name == "dimension-crane-yumako" then table.insert(storage.agricultural.yumako_towers, crane) end
-    if crane.name == "dimension-crane-jellynut" then table.insert(storage.agricultural.jellynut_towers, crane) end
+    -- Resolve the owning team from the surface; cranes may only be placed on that
+    -- team's WARP surface (role 'surface'). A nil ctx is rejected.
+    local owner = dw.surface_owner(crane.surface.index)
+    local ctx = owner and dw.warp_ctx(owner) or nil
+    if not utils.entity_built_surface_check(event, ctx, "surface", "dw-messages.cannot-build-crane") then return end
+    local force_name = owner
+
+    if crane.name == "dimension-crane-yumako" then table.insert(ctx.agricultural.yumako_towers, crane) end
+    if crane.name == "dimension-crane-jellynut" then table.insert(ctx.agricultural.jellynut_towers, crane) end
 
     local crane_pole = crane.surface.create_entity {
         name = "dw-hidden-gate-pole",
         position = crane.position,
-        force = game.forces.player,
+        force = game.forces[force_name],
     }
     crane_pole.destructible = false
-    utils.link_cables(crane_pole, storage.agricultural.pole, defines.wire_connectors.power)
+    if ctx.agricultural.pole and ctx.agricultural.pole.valid then
+        utils.link_cables(crane_pole, ctx.agricultural.pole, defines.wire_connectors.power)
+    end
 end
 
 ---@param event (EventData.on_player_mined_entity|EventData.on_robot_mined_entity|EventData.on_entity_died)
@@ -74,38 +90,47 @@ local function crane_destroyed(event)
     if pole then pole.destroy() end
 end
 
-local function move_crane_items(event)
-    transfer_seeds_fruits(storage.agricultural.jellynut_towers, storage.agricultural.jellynut_input, storage.agricultural.jellynut_output, "jellynut-seed")
-    transfer_seeds_fruits(storage.agricultural.yumako_towers, storage.agricultural.yumako_input, storage.agricultural.yumako_output, "yumako-seed")
+local function move_crane_items(force_name, ctx)
+    transfer_seeds_fruits(ctx.agricultural.jellynut_towers, ctx.agricultural.jellynut_input, ctx.agricultural.jellynut_output, "jellynut-seed")
+    transfer_seeds_fruits(ctx.agricultural.yumako_towers, ctx.agricultural.yumako_input, ctx.agricultural.yumako_output, "yumako-seed")
 end
 
 local function on_technology_research_finished(event)
+    local force = event.research.force
+    if not force.name:find("^team%-") then return end
+    if not dw.has_warp_ctx(force.name) then return end
+    local force_name = force.name
+    local ctx = dw.warp_ctx(force_name)
     local tech = event.research
+
     if tech.name == "dimension-crane" then
-        local yumako_input = storage.platform.mining.surface.create_entity {
+        if not (ctx.platform.mining.surface and ctx.platform.mining.surface.valid) then return end
+        local fforce = game.forces[force_name]
+        local mining = ctx.platform.mining.surface
+        local yumako_input = mining.create_entity {
             name = "dw-crane-yumako-seed-input",
             position = {-0.5, -0.5},
-            force = game.forces.player,
+            force = fforce,
         }
-        local yumako_output = storage.platform.mining.surface.create_entity {
+        local yumako_output = mining.create_entity {
             name = "dw-crane-yumako-output",
             position = {-0.5, 0.5},
-            force = game.forces.player,
+            force = fforce,
         }
-        local jellynut_input = storage.platform.mining.surface.create_entity {
+        local jellynut_input = mining.create_entity {
             name = "dw-crane-jellynut-seed-input",
             position = {0.5, -0.5},
-            force = game.forces.player,
+            force = fforce,
         }
-        local jellynut_output = storage.platform.mining.surface.create_entity {
+        local jellynut_output = mining.create_entity {
             name = "dw-crane-jellynut-output",
             position = {0.5, 0.5},
-            force = game.forces.player,
+            force = fforce,
         }
-        local fruit_pole = storage.platform.mining.surface.create_entity {
+        local fruit_pole = mining.create_entity {
             name = "dw-hidden-gate-pole",
             position = {0.5, 0.5},
-            force = game.forces.player,
+            force = fforce,
         }
         yumako_input.destructible = false
         yumako_output.destructible = false
@@ -113,20 +138,20 @@ local function on_technology_research_finished(event)
         jellynut_output.destructible = false
         fruit_pole.destructible = false
 
-        storage.agricultural.yumako_input = yumako_input
-        storage.agricultural.yumako_output = yumako_output
-        storage.agricultural.jellynut_input = jellynut_input
-        storage.agricultural.jellynut_output = jellynut_output
+        ctx.agricultural.yumako_input = yumako_input
+        ctx.agricultural.yumako_output = yumako_output
+        ctx.agricultural.jellynut_input = jellynut_input
+        ctx.agricultural.jellynut_output = jellynut_output
 
-        storage.agricultural.pole = fruit_pole
+        ctx.agricultural.pole = fruit_pole
 
-        storage.agricultural.yumako_towers = {}
-        storage.agricultural.jellynut_towers = {}
+        ctx.agricultural.yumako_towers = {}
+        ctx.agricultural.jellynut_towers = {}
     end
 end
 
 dw.register_event(defines.events.on_research_finished, on_technology_research_finished)
-dw.register_event("on_nth_tick_60", move_crane_items)
+dw.register_team_tick(60, move_crane_items)
 
 dw.register_event(defines.events.on_built_entity, crane_built)
 dw.register_event(defines.events.on_robot_built_entity, crane_built)

@@ -5,10 +5,11 @@
 -- scripts/warp_ctx.lua), and the loop is driven by dw.register_team_tick so it
 -- runs once per team each period. game.forces.player becomes game.forces[force_name].
 --
--- EXPECTED stale (slices 4-7): the aux helpers this loop still calls
--- (dw.set_warp_evolution_factor, dw.gui.*, dw.platforms.*, dw.update_warp_platform_size,
--- storage.warpgate.*) keep reading the flat globals for now. That divergence is
--- intentional and must NOT be "fixed" here.
+-- P4 (aux subsystems) DONE: every aux helper this loop calls (dw.platforms.*,
+-- dw.gate.*, dw.update_warp_platform_size, the warp gate + harvesters) is per-team
+-- ctx too. No flat-global aux reads remain in the warp loop. The only flat
+-- storage still init'd in control.lua's set_globals is dead/legacy state kept so
+-- the inherited DW migration scripts (migrations/) don't nil-crash on old saves.
 dw.warp = dw.warp or {}
 
 local function calculate_manual_warp_time(ctx)
@@ -167,6 +168,19 @@ local function depart_to_dock(force_name, ctx, target)
     ctx.warp.status = defines.warp.preparing
     ctx.warp.pending_destination = target
 
+    -- Same pre-departure teardown as the online warp (warp_timer): return the
+    -- mobile gate and recall any deployed harvesters onto the PERMANENT mining
+    -- platform BEFORE we leave. The old warp surface they sit on is about to be
+    -- cloned to the dock and then retired -- without this, docking offline would
+    -- destroy a deployed harvester and leave ctx.harvesters[side] pointing at dead
+    -- entities. ctx.warp.current is still the old world here (generate_dock_surface
+    -- advances it below), so recall reads the correct surface.
+    if ctx.warpgate.mobile_gate then
+        ctx.warpgate.mobile_gate.destroy{raise_destroy=true}
+    end
+    dw.platforms.recall_harvester(force_name, ctx, "left")
+    dw.platforms.recall_harvester(force_name, ctx, "right")
+
     if not dw.generate_dock_surface(force_name, ctx) then
         dw.diag("depart_to_dock[%s]: generate_dock_surface=false -> rollback", force_name)
         ctx.warp.status = defines.warp.awaiting
@@ -189,6 +203,21 @@ local function depart_to_dock(force_name, ctx, target)
         force_name, dw.diag_surface(ctx.warp.current.surface), tostring(target))
 end
 dw.warp.depart_to_dock = depart_to_dock
+
+-- Re-tile the platforms and relink the warp-SIDE stair/gate handles after an
+-- Arrive: the platform clone gives those entities new unit_numbers, so the
+-- dimension<->surface stairs and the warp gate must be re-found (the dimension
+-- side lives on un-cloned surfaces and persists). Shared by the online warp loop
+-- and the dock resume warp-out so both preserve aux infrastructure across a jump.
+-- (harvester place_harvester_tiles is still flat -- threaded in S6.)
+local function post_arrive_reinit(force_name, ctx)
+    if ctx.platform.factory.surface then dw.platforms.init_update_factory_platform(force_name, ctx) end
+    if ctx.harvesters.left.gate then dw.platforms.place_harvester_tiles(force_name, ctx, "left") end
+    if ctx.harvesters.right.gate then dw.platforms.place_harvester_tiles(force_name, ctx, "right") end
+    if ctx.platform.mining.surface then dw.platforms.init_update_mining_platform(force_name, ctx) end
+    if ctx.platform.power.surface then dw.platforms.init_update_power_platform(force_name, ctx) end
+    dw.platform_force_update_entities(force_name, ctx)
+end
 
 local function warp_timer(force_name, ctx)
     -- Skip a team MTS has paused: no warp clock, no ticking, no warp.
@@ -248,12 +277,13 @@ local function warp_timer(force_name, ctx)
                 depart_to_dock(force_name, ctx, target)
             else
                 -- return warp gate
-                if storage.warpgate.mobile_gate then
-                    storage.warpgate.mobile_gate.destroy{raise_destroy=true}
+                if ctx.warpgate.mobile_gate then
+                    ctx.warpgate.mobile_gate.destroy{raise_destroy=true}
                 end
-                -- harvesters recall
-                dw.platforms.recall_harvester("left")
-                dw.platforms.recall_harvester("right")
+                -- harvesters recall (pack them back onto the mining platform
+                -- BEFORE prepare_warp retires the old warp surface they sit on)
+                dw.platforms.recall_harvester(force_name, ctx, "left")
+                dw.platforms.recall_harvester(force_name, ctx, "right")
 
                 -- generate new surface and teleport
                 prepare_warp_to_next_surface(force_name, ctx, target)
@@ -271,11 +301,7 @@ local function warp_timer(force_name, ctx)
 
                 -- once everything's done, force recreate the tiles in platforms (because some explosions may break some.)
                 dw.update_warp_platform_size(force_name, ctx)
-                if storage.platform.factory.surface then dw.platforms.init_update_factory_platform() end
-                if storage.harvesters.left.gate then dw.platforms.place_harvester_tiles("left") end
-                if storage.harvesters.right.gate then dw.platforms.place_harvester_tiles("right") end
-                if storage.platform.mining.surface then dw.platforms.init_update_mining_platform() end
-                if storage.platform.power.surface then dw.platforms.init_update_power_platform() end
+                post_arrive_reinit(force_name, ctx)
             end
         end
     end
@@ -362,6 +388,9 @@ local function dock_timer(force_name, ctx)
             ctx.pollution = 1
             dw.gui.update_manual_warp_button()
             dw.update_warp_platform_size(force_name, ctx)
+            -- Same post-Arrive re-init as the online warp: re-tile platforms and
+            -- relink the warp-side stairs/gate so aux infra survives the dock exit.
+            post_arrive_reinit(force_name, ctx)
         else
             -- Transient create failure: stay docked + frozen, retry shortly.
             dw.diag("dock_timer[%s]: warp-out FAILED -> stay docked, retry in 5s", force_name)
