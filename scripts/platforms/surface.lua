@@ -140,13 +140,14 @@ local function teleport_platform(force_name, ctx)
                     dw.safe_teleport(player, destination, player.physical_position, true)
                 end
             else
-                -- Off-platform players are left behind on the source world and
-                -- die -- UNLESS we are leaving nauvis (the safe home base). Read
-                -- the planet from ctx (a STRING, always set) and NOT source.planet:
-                -- a nauvis warp surface (mdw-nauvis-wN) has surface.planet == nil
-                -- (create_team_surface only associates non-nauvis planets), so
-                -- source.planet.name would crash here exactly as get_allowed_planet did.
-                if ctx.warp.previous.planet ~= "nauvis" then
+                -- Off-platform players are left behind on the source world, which
+                -- THIS warp retires -- so kill them immediately so they respawn (on
+                -- the factory floor, see teleport.lua) and rejoin the team instead of
+                -- being stranded on a dead surface. Every per-team source is retired,
+                -- including the warp #0 home (planet == "nauvis"), so there is no
+                -- "leaving nauvis -> keep them" exception anymore. Guard the character:
+                -- a ghost/spectator-controller player has none.
+                if player.character and player.character.valid then
                     player.character.die()
                 end
             end
@@ -171,8 +172,8 @@ local function teleport_platform(force_name, ctx)
         if p and not p.connected then
             if math2d.bounding_box.contains_point(platform_area_delta, char.position) then
                 dw.safe_teleport(char, destination, char.position, true)   -- move the body
-            elseif ctx.warp.previous.planet ~= "nauvis" then
-                char.die()
+            else
+                char.die()   -- left behind on the retired source -> respawn on reconnect
             end
         end
     end

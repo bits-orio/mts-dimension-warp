@@ -1,4 +1,10 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.8.7
+Date: 19/06/2026
+  Bugfixes:
+    - A player left off the platform when the team warps is now killed immediately so they respawn with the team (on the factory floor) instead of being stranded on the retired world. This now also applies when leaving the home world.
+    - Fixed a crash when refreshing the item-watch panel before its table had been built (could happen around death and respawn). The refresh now skips a watchdog row that is not ready yet instead of erroring.
+---------------------------------------------------------------------------------------------------
 Version: 0.8.6
 Date: 19/06/2026
   Features:

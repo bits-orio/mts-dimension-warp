@@ -399,20 +399,27 @@ local function update_watchdogs_gui()
         local player_gui_settings = get_player_gui_settings(player)
 
         for watchdog, item in pairs(ctx.gui.item_watch) do
-            local item_quantity = ctx.gui.item_list[item.name .. '-' .. item.quality] or 0
+            local item_quantity = ctx.gui.item_list[item.name .. '-' .. item.quality]
+            -- Skip until misc.lua has populated this item's running totals (it is a
+            -- {qty, prev} table; absent until counted).
+            if type(item_quantity) ~= "table" then goto continue_watchdog end
+
             local frameflow = mod_gui.get_frame_flow(player)
-
-            if not frameflow.dw_frame or not frameflow.dw_frame.container_frame then
-                get_container_frame(player)
+            -- A container frame can exist WITHOUT its item_table: get_container_frame
+            -- returns early (before adding item_table) for a player who had no team
+            -- ctx, e.g. mid death/respawn. (Re)build defensively, then bail on this
+            -- watchdog if the cell still isn't there rather than indexing a nil.
+            local frame = frameflow.dw_frame and frameflow.dw_frame.container_frame
+            if not (frame and frame.item_table and frame.item_table[watchdog]
+                    and frame.item_table[watchdog].count) then
+                frame = get_container_frame(player)
             end
-
-            local frame = frameflow.dw_frame.container_frame
-            if not frame.item_table[watchdog].count then
-                get_container_frame(player)
-            end
+            local count = frame and frame.item_table and frame.item_table[watchdog]
+                and frame.item_table[watchdog].count
+            if not count then goto continue_watchdog end
 
             local item_variation = item_quantity.qty - item_quantity.prev
-            frame.item_table[watchdog].count.tooltip = nil
+            count.tooltip = nil
             if player_gui_settings.highlight_change then
                 local color = util.color(player_gui_settings.default_color)
                 if item_variation > 0 then
@@ -420,16 +427,17 @@ local function update_watchdogs_gui()
                 elseif item_variation < 0 then
                     color = util.color(player_gui_settings.decrease_color)
                 end
-                frame.item_table[watchdog].count.style.font_color = color
-                frame.item_table[watchdog].count.tooltip = (item_variation ~= 0 and {"dw-gui.item-variation", item_variation} or nil)
+                count.style.font_color = color
+                count.tooltip = (item_variation ~= 0 and {"dw-gui.item-variation", item_variation} or nil)
             end
 
             -- starting 1million, we don't display the exact value anymore.
             if item_quantity.qty >= 1000000 then
-                frame.item_table[watchdog].count.caption = util.format_number(item_quantity.qty, true)
+                count.caption = util.format_number(item_quantity.qty, true)
             else
-                frame.item_table[watchdog].count.caption = utils.format_thousands(item_quantity.qty, player_gui_settings.delimiter)
+                count.caption = utils.format_thousands(item_quantity.qty, player_gui_settings.delimiter)
             end
+            ::continue_watchdog::
         end
 
         ::continue::
