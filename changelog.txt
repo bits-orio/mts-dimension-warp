@@ -1,4 +1,14 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.8.4
+Date: 18/06/2026
+  Features:
+    - Per-team dimension subsystems: the Factory (Produstia), Mining (Smeltus) and Power (Electria) platforms, the warp gate, the harvesters and the agricultural crane are now fully per-team. Every team gets and owns its own dimension surfaces, so these all work with any number of teams instead of only the first.
+  Changes:
+    - Warp generator research now extends the auto-warp timer 5 minutes at a time. New half-levels fill the chain (warp-generator-1, 1.5, 2, 2.5, ... 6, 6.5), running 15 to 70 minutes as a required ladder, and each level's tooltip states the +5 minutes.
+  Bugfixes:
+    - Fixed a crash when a team researched a factory, mining or power platform, the warp gate, a harvester, or a stair-count tech before its warp or dimension surface was ready.
+    - Docking while offline with a harvester deployed no longer destroys it: the harvester is now recalled onto the mining platform before the old warp surface is retired, matching the online warp.
+---------------------------------------------------------------------------------------------------
 Version: 0.8.3
 Date: 07/05/2026
   Bugfixes:
