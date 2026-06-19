@@ -24,6 +24,12 @@ end
 -- The one line that applies to the whole team this second: localised text + colour.
 local function compose_label(ctx)
     if ctx.warp.docked then
+        -- Resume in progress: show the live resume countdown (ctx.timer.dock is
+        -- armed + ticking to zero only once a member chooses resume) instead of the
+        -- static docked line, in a warm "warp imminent" colour.
+        if ctx.timer.dock then
+            return {"dw-gui.autowarp-resuming", fmt_mmss(ctx.timer.dock)}, {r = 1.0, g = 0.72, b = 0.30}
+        end
         return {"dw-gui.autowarp-docked"}, {r = 1.0, g = 0.85, b = 0.55}
     elseif not ctx.timer.active then
         -- Pre-generator: if the eviction backstop is counting down, show it as an

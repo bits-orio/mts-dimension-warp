@@ -180,6 +180,7 @@ require "scripts.scenario.victory"
 
 require "scripts.warp"
 require "scripts.warp_timer_label"
+require "scripts.dock_wake"
 require "scripts.enemies"
 
 require "scripts.entities.warpgate"

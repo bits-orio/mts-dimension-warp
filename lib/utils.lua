@@ -1,10 +1,24 @@
 utils = {} or utils
 
+-- The factory / mining / power DIMENSION worlds. These are the per-team floors you
+-- reach by stairs (dimensions.lua creates them on these planets via init_surface),
+-- NOT places to warp the whole base to -- so they are never warp destinations.
+-- Researching factory/mining/power-platform unlocks them as space locations, which
+-- is why they otherwise leaked into the random destination pool. Warp destinations
+-- are the "real" worlds only (neo-nauvis + the discovered Space Age planets).
+utils.dimension_planets = { produstia = true, smeltus = true, electria = true }
+
 
 -- return if we should ignore the planet for warp selection
 function utils.ignore_planet(planet)
     -- ignore nauvis
     if planet == "nauvis" and not storage.victory then return true end
+    -- ignore the factory/mining/power dimension worlds (floors, not destinations).
+    -- Planet names come as the per-variant "mts-<base>-<N>" (e.g. mts-produstia-7)
+    -- as well as the bare base, so match the dimension base name as a substring.
+    for base in pairs(utils.dimension_planets) do
+        if planet:find(base, 1, true) then return true end
+    end
     -- ignore specials surface frm the mod
     if dw.safe_surfaces[planet] then return true end
     if planet:match('.*%-factory%-floor') or planet:match('factory%-travel%-surface') then return true end

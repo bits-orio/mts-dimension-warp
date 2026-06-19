@@ -22,8 +22,13 @@ function dw.apply_dock_stasis(surface, ctx)
         if old and old.valid then old.destroy() end
         ctx.warp.dock_tint_id = nil
     end
-    surface.daytime = 0.45
+    surface.daytime = 0.35   -- cold "frozen" evening; dock_wake darkens this to the black night on resume
     surface.freeze_daytime = true
+    -- Remove the planet's night-light floor (default 0.15) so that when dock_wake
+    -- darkens the sky to midnight the dock reads as a pure-black starfield, not a
+    -- bluish neo-nauvis night. The dock surface is retired at warp, so this never
+    -- leaks to the destination.
+    surface.min_brightness = 0
     local r = (ctx.platform.warp.size / 32 + 2) * 32
     local tint = rendering.draw_rectangle{
         color = {r = 0.10, g = 0.07, b = 0.22, a = 0.22},   -- cold indigo/violet
@@ -32,6 +37,8 @@ function dw.apply_dock_stasis(surface, ctx)
         surface = surface,
     }
     ctx.warp.dock_tint_id = tint and tint.id or nil
+    dw.diag("apply_dock_stasis surface=%s daytime=%.3f min_brightness=%.3f tint_id=%s",
+        surface.name, surface.daytime, surface.min_brightness, tostring(ctx.warp.dock_tint_id))
 end
 
 local function force_map_settings()

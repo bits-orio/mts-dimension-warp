@@ -1,4 +1,15 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.8.6
+Date: 19/06/2026
+  Features:
+    - Dying now respawns you in your safe Produstia factory dimension instead of dead-centre on the warp surface, so biters can no longer spawn-camp your respawn point. Falls back to the warp surface if you have not unlocked the factory floor yet.
+    - The docked base's surface text now shows a live "Resuming - warp in M:SS" countdown while a parked team is resuming.
+  Changes:
+    - Reworked the dock "wake from stasis": on resume the docked starfield now thaws smoothly and evenly from a cold frozen evening to a pure-black night sky (no warm flash, no abrupt jump). The resume window is shortened to 20 seconds and the thaw to about 6.
+    - The warp alarm and warp-drive sounds now play only for the warping team, not globally for every player on the server.
+  Bugfixes:
+    - The Factory, Mining and Power dimension floors no longer turn up as random warp destinations - they are floors you reach by stairs, not worlds to warp the whole base to.
+---------------------------------------------------------------------------------------------------
 Version: 0.8.5
 Date: 19/06/2026
   Features:

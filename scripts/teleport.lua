@@ -143,6 +143,24 @@ local function dead_on_previous_surface(event)
     end
 end
 
+--- Respawn into the safe Produstia factory floor instead of dead-centre on the warp
+--- surface, where biters spawn-camp the (0,0) respawn point (the dimension floors are
+--- enemy-free and walled by impassable dimension-space void). Vanilla puts the fresh
+--- character on the death surface at the force spawn; we move it down to the factory.
+--- The gate infrastructure lives to the north (y<=-6), so (0,0) is open buildable
+--- floor, and safe_teleport's anti-spam cooldown + the gate only firing while WALKING
+--- means it won't bounce straight back up. No-op (normal warp-surface respawn stands)
+--- if the team has no factory floor yet.
+local function respawn_in_factory(event)
+    local player = game.players[event.player_index]
+    if not (player and player.valid) then return end
+    if not dw.has_warp_ctx(player.force.name) then return end
+    local factory = dw.warp_ctx(player.force.name).platform.factory.surface
+    if factory and factory.valid then
+        safe_teleport(player, factory, {0, 0}, true)
+    end
+end
+
 
 --- make sure new players are teleported to the new surface
 local function teleport_safely_player_on_event(event)
@@ -162,6 +180,7 @@ end
 
 
 dw.register_event(defines.events.on_player_died, dead_on_previous_surface)
+dw.register_event(defines.events.on_player_respawned, respawn_in_factory)
 dw.register_event(defines.events.on_player_created, teleport_safely_player_on_event)
 dw.register_event(defines.events.on_player_joined_game, teleport_safely_player_on_event)
 dw.register_event('on_nth_tick_6', check_player_teleport)

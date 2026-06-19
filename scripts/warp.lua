@@ -141,8 +141,8 @@ end
 -- the cadence needs tuning). Power returns instantly on resume; the ~60s window
 -- (with an "imminent" ping at ~30s) caps the powered time so the dock is an
 -- airlock, not a campsite.
-local DOCK_FORCED_WARP_SECONDS = 60
-local DOCK_IMMINENT_SECONDS    = 30
+local DOCK_FORCED_WARP_SECONDS = 20   -- resume -> forced warp-out window
+local DOCK_IMMINENT_SECONDS    = 6    -- "warp imminent" ping, at this many seconds left
 
 -- Is ANY member of this team online right now? Reads the mts-v1 liveness query.
 -- ctx.warp.test_offline is a one-shot override (set by /mdw-offlinewarp) so the
@@ -226,6 +226,19 @@ local function post_arrive_reinit(force_name, ctx)
     dw.platform_force_update_entities(force_name, ctx)
 end
 
+-- Play a warp cue (alarm / warpdrive) for the WARPING TEAM's members only, never
+-- globally -- one team's warp must not blare for every player on the server.
+-- Spectator-aware: dw.effective_force resolves a member spectating another team to
+-- their real team, so they still hear their own base's cue, and a player spectating
+-- THIS team from another force does not.
+local function play_team_sound(force_name, sound)
+    for _, p in pairs(game.connected_players) do
+        if p.valid and dw.effective_force(p) == force_name then
+            p.play_sound(sound)
+        end
+    end
+end
+
 local function warp_timer(force_name, ctx)
     -- Skip a team MTS has paused: no warp clock, no ticking, no warp.
     if remote.call('mts-v1', 'is_team_paused', force_name) then
@@ -270,7 +283,7 @@ local function warp_timer(force_name, ctx)
 
         if (ctx.timer.warp < 60 and ctx.timer.warp > 0) or ctx.timer.manual_warp < 10 then
             if game.tick % (3 * 60) == 0 then
-                game.play_sound{path = "dw-alarm"}
+                play_team_sound(force_name, {path = "dw-alarm"})
             end
         end
 
@@ -304,8 +317,8 @@ local function warp_timer(force_name, ctx)
 
                 -- generate new surface and teleport
                 prepare_warp_to_next_surface(force_name, ctx, target)
-                -- play sound
-                game.play_sound{path = "dw-warpdrive"}
+                -- play sound (for the warping team only)
+                play_team_sound(force_name, {path = "dw-warpdrive"})
                 if ctx.warp.message then game.print({ctx.warp.message}) end
                 ctx.warp.message = nil
 
@@ -355,6 +368,7 @@ dw.warp.warp_timer = warp_timer
 function dw.refreeze_dock(force_name, ctx)
     ctx.warp.resume_chosen = false
     ctx.timer.dock = nil
+    dw.cancel_dock_wake(force_name)   -- stop any in-flight wake before re-chilling
     local dock = ctx.warp.current and ctx.warp.current.surface
     pcall(dw.apply_dock_stasis, dock, ctx)
     -- Re-pause now to avoid a powered window with nobody aboard (the
@@ -418,26 +432,13 @@ local function dock_timer(force_name, ctx)
             end
         end
 
-        -- Wake from stasis (the grilled resume beat): as power returns the cold,
-        -- dim dock warms back to life. Kill the cold indigo wash, brighten the
-        -- frozen daytime, pulse a brief warm glow that fades on its own
-        -- (time_to_live -- no tick handler), and mark the moment with a soft cue.
+        -- Thaw from stasis: dock_wake.lua darkens the cold "frozen" evening sky to
+        -- the black default night and fades the cold wash, over the resume window,
+        -- driven at ~20Hz.
         if dock and dock.valid then
-            if ctx.warp.dock_tint_id then
-                local cold = rendering.get_object_by_id(ctx.warp.dock_tint_id)
-                if cold and cold.valid then cold.destroy() end
-                ctx.warp.dock_tint_id = nil
-            end
-            dock.daytime = 0.0
-            dock.freeze_daytime = true
-            local r = (ctx.platform.warp.size / 32 + 2) * 32
-            rendering.draw_rectangle{
-                color = {r = 0.55, g = 0.42, b = 0.20, a = 0.30},   -- warm amber thaw-flash
-                filled = true, draw_on_ground = true,
-                left_top = {-r, -r}, right_bottom = {r, r},
-                surface = dock, time_to_live = 45,                  -- ~0.75s, then gone
-            }
-            dock.play_sound{path = "dw-teleport"}
+            dw.start_dock_wake(force_name, ctx, dock, game.tick)
+        else
+            dw.diag("dock_timer[%s]: RESUME but dock surface invalid -- no thaw", force_name)
         end
         ctx.timer.dock = DOCK_FORCED_WARP_SECONDS
         if force and force.valid then
@@ -468,7 +469,9 @@ local function dock_timer(force_name, ctx)
             ctx.warp.dock_surface_name = nil
             ctx.warp.dock_surface_index = nil
             ctx.timer.dock = nil
-            game.play_sound{path = "dw-warpdrive"}
+            dw.cancel_dock_wake(force_name)   -- dock retired; drop any wake state
+
+            play_team_sound(force_name, {path = "dw-warpdrive"})
             reset_timer_vote(ctx)
             dw.set_warp_evolution_factor(force_name, ctx)
             ctx.pollution = 1
