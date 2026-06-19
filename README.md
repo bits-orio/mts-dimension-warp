@@ -6,11 +6,11 @@ Per-team Dimension Warp for Multi-Team Support. Every team builds on a platform 
 
 ## Built on Dimension Warp — by Anakhon
 
-MTS Dimension Warp is a fork of **[Dimension Warp](https://github.com/Kyria/dimension-warp), created by Anakhon (Guillaume).**
+MTS Dimension Warp is a fork of **[Dimension Warp](https://mods.factorio.com/mod/dimension-warp), created by Anakhon (Guillaume).**
 
 Everything that makes the warp *feel* the way it does — the platform that carries your whole base between worlds, the dimension techs, the harvesters, the art and sound, the relentless pace of Gleba — is Anakhon's work, written from scratch. This fork does exactly one thing on top of that: it makes the experience **per-team**, so it can be played as a fair race on [Multi-Team Support](https://github.com/bits-orio/multi-team-support).
 
-The game underneath this belongs to Anakhon. If you enjoy it, go play the **[original Dimension Warp](https://github.com/Kyria/dimension-warp)** — and for the full detail of the warp gameplay (compatibilities, Rampant tuning, the dimension techs, planet behaviour), the [original README](https://github.com/Kyria/dimension-warp) is the source of truth, and all of it applies here.
+The game underneath this belongs to Anakhon. If you enjoy it, go play the **[original Dimension Warp](https://mods.factorio.com/mod/dimension-warp)** — its mod page is the source of truth for the full detail of the warp gameplay (compatibilities, Rampant tuning, the dimension techs, planet behaviour), and all of it applies here.
 
 ## What this fork changes
 
@@ -34,7 +34,7 @@ This mod stands on a chain of work, with gratitude to every link:
 
 1. **[Warptorio](https://mods.factorio.com/mod/warptorio)** by [Nonoce](https://mods.factorio.com/user/NONOCE) — the original warping-platform idea.
 2. **[Warptorio2](https://mods.factorio.com/mod/warptorio2)** by [PyroFire](https://mods.factorio.com/user/PyroFire) — which expanded and refined it.
-3. **[Dimension Warp](https://github.com/Kyria/dimension-warp)** by Anakhon — a from-scratch take for Factorio 2.0 / Space Age, and the direct basis for this fork.
+3. **[Dimension Warp](https://mods.factorio.com/mod/dimension-warp)** by Anakhon — a from-scratch take for Factorio 2.0 / Space Age, and the direct basis for this fork.
 4. **MTS Dimension Warp** — this per-team adaptation for Multi-Team Support.
 
 ## License
