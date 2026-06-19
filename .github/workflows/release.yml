@@ -220,6 +220,20 @@ jobs:
             "${{ steps.info.outputs.version }}" \
             "${{ steps.info.outputs.folder }}.zip"
 
+      # Keep the mod portal page's DESCRIPTION in sync with README.md on every
+      # release (edit_details API, partial update — category/license/tags are
+      # left untouched). Needs the API key to ALSO have the "ModPortal: Edit
+      # Mods" scope (separate from "Upload Mods"). Non-fatal: a missing scope or
+      # transient error must not fail an otherwise-good release.
+      - name: Sync mod portal description from README
+        if: ${{ always() && steps.release.outcome == 'success' && env.FACTORIO_API_KEY != '' }}
+        continue-on-error: true
+        run: |
+          ./tools/update_mod_details.sh \
+            "${{ steps.info.outputs.name }}" \
+            "README.md" \
+            "https://github.com/${{ github.repository }}"
+
       # Short "now live on the mod portal" ping to a separate announcements
       # channel. The full changelog goes to DISCORD_WEBHOOK (changelog
       # channel); this is the human-facing "go play it" message that fires
