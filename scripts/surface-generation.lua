@@ -8,6 +8,32 @@ if script.active_mods['space-age'] then
     require "scripts.planets.aquilo"
 end
 
+-- Apply the docked-in-space "stasis" look to a dock surface: a dim frozen daytime
+-- and a faint cold indigo wash over the floor + void (cold, dim, dead-still -- the
+-- grilled spec). Dim but legible, so the parked base stays inspectable. Idempotent:
+-- it destroys any prior wash first, so re-freezing a dock (after an interrupted
+-- resume) never stacks rectangles. Stores the render id on ctx.warp.dock_tint_id so
+-- the resume "wake from stasis" beat (dock_timer) can clear it. Tune colour/alpha
+-- live in-game.
+function dw.apply_dock_stasis(surface, ctx)
+    if not (surface and surface.valid) then return end
+    if ctx.warp.dock_tint_id then
+        local old = rendering.get_object_by_id(ctx.warp.dock_tint_id)
+        if old and old.valid then old.destroy() end
+        ctx.warp.dock_tint_id = nil
+    end
+    surface.daytime = 0.45
+    surface.freeze_daytime = true
+    local r = (ctx.platform.warp.size / 32 + 2) * 32
+    local tint = rendering.draw_rectangle{
+        color = {r = 0.10, g = 0.07, b = 0.22, a = 0.22},   -- cold indigo/violet
+        filled = true, draw_on_ground = true,
+        left_top = {-r, -r}, right_bottom = {r, r},
+        surface = surface,
+    }
+    ctx.warp.dock_tint_id = tint and tint.id or nil
+end
+
 local function force_map_settings()
     game.map_settings.pollution.enabled = true
     game.map_settings.pollution.diffusion_ratio = 0.105
@@ -200,6 +226,12 @@ local function generate_dock_surface(force_name, ctx)
     mapgen.peaceful_mode = true
     mapgen.seed = map_seed()   -- deterministic: the dock is identical for all teams
 
+    -- Docked-in-space look: generate the dock as the dimension-space STARFIELD (the
+    -- same void our dimension floors float in), not neo-nauvis planet terrain -- so
+    -- the parked base reads as floating in space, not parked on dirt.
+    mapgen.autoplace_settings = mapgen.autoplace_settings or {}
+    mapgen.autoplace_settings.tile = { treat_missing_as_default = false, settings = { ["dimension-space"] = {} } }
+
     -- Unique per dock cycle: ctx.warp.number is stable while docked (docking does
     -- not bump it) and increments after each resume warp, so successive docks get
     -- distinct names -- a fresh dock can never alias the PREVIOUS dock that is
@@ -230,6 +262,12 @@ local function generate_dock_surface(force_name, ctx)
     dw.set_surface_owner(surface.index, force_name)
     surface.request_to_generate_chunks({x = 0, y = 0}, ctx.platform.warp.size / 32 + 1)
     surface.force_generate_chunk_requests()
+
+    -- Cold, dim, dead-still cosmic mood, distinct from the active floors (the
+    -- grilled docked-in-space spec). Cleared on resume for the "wake from stasis"
+    -- beat (dock_timer), restored if the resume is interrupted (refreeze_dock).
+    dw.apply_dock_stasis(surface, ctx)
+
     dw.diag("generate_dock_surface force=%s DOCKED current=%s (number unchanged=%d)",
         force_name, dw.diag_surface(surface), ctx.warp.number)
     return true

@@ -9,6 +9,10 @@
 --- accumulated value, then pollute the warp surface (to trigger bases & cie)
 --- based on warptorio original formula, as it was already really good.
 local function pollute(force_name, ctx)
+	-- Pollution (and the enemy pressure it brings) holds off until the warp clock
+	-- is armed (warp-generator-1). Early-game motivation comes from the TECH gate
+	-- instead -- logistic-science-pack requires warp-generator-1 -- so the home
+	-- planet never turns hostile before a team has established itself.
 	if not ctx.timer.active or ctx.victory then return end
 	local pollution = 0
 

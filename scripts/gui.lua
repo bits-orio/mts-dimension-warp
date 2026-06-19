@@ -203,6 +203,16 @@ local function update_manual_warp_button()
         local button = frame.warp_button
         button.visible = ctx.timer.active
 
+        -- Docked (#3a): the base is parked in space and frozen. The only way out
+        -- is the dock-resume prompt, so the regular warp vote button is shown but
+        -- disabled with a "Docked -- resume" caption until the resume completes
+        -- (which clears ctx.warp.docked and restores the normal captions below).
+        if ctx.warp.docked then
+            button.caption = {"dw-gui.warp-button-docked"}
+            button.enabled = false
+            goto continue
+        end
+
         if ctx.votes.count >= ctx.votes.min_vote then
             button.caption = {"dw-gui.warp-button-warping"}
             button.enabled = false
@@ -260,7 +270,11 @@ local function warp_frame_click(event)
     -- guarding here is belt-and-suspenders against a stray click event.
     if button.name == "warp_button" then
         local ctx = ctx_for_player(player)
-        if ctx then
+        -- Vote guard (#3b): a docked team can only leave via dock-resume, so a
+        -- stray warp-vote click (e.g. a queued click landing as the dock opens)
+        -- must not register a vote. The button itself is disabled while docked;
+        -- this guards the event path too.
+        if ctx and not ctx.warp.docked then
             ctx.votes.count = ctx.votes.count + 1
             ctx.votes.players[event.player_index] = true
             update_manual_warp_button()

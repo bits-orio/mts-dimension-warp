@@ -22,6 +22,12 @@ dw = dw or {}
 
 local warp_ctx_lib = {}
 
+-- Eviction backstop grace (lever 2): how long a team may sit on its home planet
+-- without arming a warp clock (no warp-generator-1) before the dimension
+-- destabilises and force-warps them on. Deliberately long -- it stops indefinite
+-- stalling without rushing a team that is genuinely progressing toward gen-1.
+dw.EVICT_GRACE_SECONDS = 30 * 60
+
 ------------------------------------------------------------
 --- Default bundle shape
 ------------------------------------------------------------
@@ -85,6 +91,7 @@ local function new_ctx()
             warp = nil,         -- countdown to the next warp
             manual_warp = nil,  -- player-vote warp countdown
             dock = nil,         -- P2: resume countdown (thaw -> forced warp out)
+            evict = nil,        -- pre-generator eviction backstop: long grace before a forced warp
         },
 
         -- warp voting
@@ -350,8 +357,13 @@ function dw.regate_existing_teams()
             -- handler's self-heal rather than trust clock-start ordering.
             ctx.timer.warp = ctx.timer.warp or ctx.timer.base
             ctx.timer.manual_warp = ctx.timer.manual_warp or ctx.timer.base
+            ctx.timer.evict = nil
         else
             ctx.timer.active = false
+            -- Pre-generator team on an upgraded save: arm the eviction backstop so
+            -- it inherits the new "can't farm the home planet forever" pressure
+            -- (lever 2). Only arm once -- preserve an in-progress grace on re-runs.
+            if ctx.timer.evict == nil then ctx.timer.evict = dw.EVICT_GRACE_SECONDS end
         end
     end
 end

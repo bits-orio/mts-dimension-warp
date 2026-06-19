@@ -1,6 +1,6 @@
 {
   "name": "mts-dimension-warp",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "title": "MTS Dimension Warp",
   "author": "bits-orio",
   "homepage": "https://github.com/bits-orio/mts-dimension-warp",
@@ -8,7 +8,7 @@
   "factorio_version": "2.0",
   "dependencies": [
     "base >= 2.0.29",
-    "multi-team-support >= 0.4.49",
+    "multi-team-support >= 0.4.50",
     "? space-age >= 2.0.29",
     "? ArmouredBiters",
     "? Toxic_biters",

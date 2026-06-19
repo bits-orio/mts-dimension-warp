@@ -1,4 +1,18 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.8.5
+Date: 19/06/2026
+  Features:
+    - Offline auto-warp now parks the base in a cold, dim "docked in space" bay on the starfield, distinct from the active floors, with a "wake from stasis" beat (lights, a warm glow pulse and a soft chime) when the team resumes.
+    - Auto-warp timer text on every team surface, under the team and location label. It reads "Auto-warp in M:SS", switches to "Manual-warp in M:SS" once a manual warp is voted through, "Docked - resume to warp" while parked, and "Dimension unstable - forced warp in M:SS" during the eviction grace.
+    - Empty floors and docks stay live-viewable in remote/map view via a hidden passive spectate radar on each floor (using Multi-Team Support's shared mts-v1 ensure_passive_radar). The top-floor console is no longer turned into an active map-scanning radar.
+    - Early-game motivation to warp: Logistic Science Pack (green science) now requires Warp Generator 1, so a team must engage warping to progress past red science. A team that never arms its warp clock is force-warped after a long "dimension destabilises" grace.
+  Changes:
+    - Platform Radar is now an early tech: it depends only on the base Radar tech (cheaper, no concrete/electrified-ground chain), and Warp Generator 2 now depends on Platform Radar - so progressing the warp ladder makes your floors spectate-able as a side effect.
+  Bugfixes:
+    - Offline auto-warp no longer leaves a logged-off player's body behind: it travels to the dock with the base.
+    - While docked you can now walk down to inspect your floors before resuming; the regular warp button is disabled ("Docked - resume") and a manual warp vote can no longer fire. If every member disconnects mid-resume, the dock re-freezes instead of warping an empty base out.
+    - The per-team manual-warp vote threshold is now computed from the team's connected members (it was stuck at 1, so a multiplayer team could warp on a single vote).
+---------------------------------------------------------------------------------------------------
 Version: 0.8.4
 Date: 18/06/2026
   Features:

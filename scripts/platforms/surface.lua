@@ -156,15 +156,18 @@ local function teleport_platform(force_name, ctx)
     --- Offline members travel by the SAME position rule. A disconnected player's
     --- character is a STANDALONE entity (LuaPlayer.character is nil while
     --- disconnected), so we find the character ENTITY on the source surface and
-    --- resolve its owning player via LuaEntity.player (valid for a disconnected
-    --- character). An on-platform offline character is MOVED to the destination
+    --- resolve its owning player via LuaEntity.associated_player. (LuaEntity.player
+    --- is the player CURRENTLY CONNECTED to the body and is nil for a logged-off
+    --- one, so it could never match this offline block -- the long-standing bug;
+    --- associated_player points at the offline owner and re-enters them on connect.)
+    --- An on-platform offline character is MOVED to the destination
     --- (the entity itself travels, so inventory + position are preserved AND it
     --- isn't duplicated by the entity-clone pass below). An off-platform one is
     --- left behind and dies -- the member respawns empty-handed on the platform
     --- when they reconnect. Connected members were already moved above; characters
     --- with no player (orphan bodies) are left to the entity clone as before.
     for _, char in pairs(source.find_entities_filtered{type = "character"}) do
-        local p = char.player
+        local p = char.associated_player
         if p and not p.connected then
             if math2d.bounding_box.contains_point(platform_area_delta, char.position) then
                 dw.safe_teleport(char, destination, char.position, true)   -- move the body
@@ -317,6 +320,26 @@ local function relink_pipes(ctx, surface, positions_list)
     end
 end
 
+-- Ensure a hidden passive spectate radar on a team floor so it stays
+-- live-viewable in remote view when empty. Delegates to MTS's shared mts-v1
+-- ensure_passive_radar -- the prototype + placement live in MTS now, so BNM
+-- reuses them. Idempotent per (surface, position): safe to re-call every Arrive.
+-- pcall-guarded -- a radar hiccup must never break a warp. Returns the radar or nil.
+function dw.ensure_floor_radar(force_name, surface, position)
+    if not (surface and surface.valid) then return nil end
+    local ok, radar = pcall(remote.call, "mts-v1", "ensure_passive_radar",
+        force_name, surface, position or {0, 0})
+    return ok and radar or nil
+end
+
+-- True once the team has researched platform-radar -- the gate that turns on
+-- passive spectate radars across all the team's floors (see the research branch).
+local function team_has_platform_radar(force_name)
+    local force = game.forces[force_name]
+    local t = force and force.valid and force.technologies["platform-radar"]
+    return t and t.researched or false
+end
+
 --- force update some entities that may be broken due to clone (new unit_numbers)
 --- and the fact surfaces are not linked to planet as soon as they are created.
 --- Called per-team from the warp loop after each Arrive. Re-finds ONLY the warp-
@@ -379,6 +402,14 @@ dw.platform_force_update_entities = function(force_name, ctx)
         end
         ctx.warpgate.gatepole = pole
     end
+
+    -- The top/warp floor is cloned every warp, so its passive spectate radar
+    -- (placed only once platform-radar is researched) lands on a fresh surface
+    -- and must be re-asserted. Idempotent + tech-gated. The dimension floors are
+    -- never cloned, so their radars persist and need no post-warp handling.
+    if team_has_platform_radar(force_name) then
+        dw.ensure_floor_radar(force_name, surface, {0, 0})
+    end
 end
 
 
@@ -402,25 +433,53 @@ local function on_technology_research_finished(event)
             tech.level, force.name, ctx.platform.warp.size)
     end
 
-    -- platform-radar (re-enabled in P4/S7 now the aux platforms are per-team):
-    -- wake the surface radio station and drop a hidden radar on each dimension
-    -- platform the team owns. Guarded per surface so a team that hasn't unlocked
-    -- a given platform is simply skipped.
+    -- platform-radar: drop a hidden PASSIVE spectate radar on every floor the team
+    -- owns -- the top/warp floor PLUS each dimension platform -- so empty floors
+    -- stay live-viewable in remote view. The console (radio_tower) is deliberately
+    -- NOT activated: an active radar sector-scans and charts the whole map over
+    -- time (= save bloat). The passive radars reveal only their local ring, for
+    -- free, with no charting. Guarded per surface (ensure_floor_radar no-ops on a
+    -- missing floor), so a team that hasn't unlocked a given platform is skipped.
+    -- The top floor is re-asserted each warp in platform_force_update_entities
+    -- (it is cloned); the dimension floors persist.
     if string.match(tech.name, "platform%-radar") then
-        local radio_tower = ctx.warp.current.surface
-            and ctx.warp.current.surface.find_entity(dw.entities.surface_radio_station.name, dw.entities.surface_radio_station.position)
-        if radio_tower then
-            radio_tower.active = true
-        end
+        dw.ensure_floor_radar(force.name, ctx.warp.current.surface, {0, 0})
         for _, role in ipairs({"factory", "mining", "power"}) do
-            local s = ctx.platform[role].surface
-            if s and s.valid then
-                local radar = s.create_entity{name = "dw-hidden-radar", force = force, position = {0, 0}}
-                radar.destructible = false
-            end
+            dw.ensure_floor_radar(force.name, ctx.platform[role].surface, {0, 0})
         end
     end
 end
 
 
 dw.register_event(defines.events.on_research_finished, on_technology_research_finished)
+
+
+-- Migration (on_configuration_changed): older versions turned the top-floor radio
+-- console into an ACTIVE radar (sector-scanning => charts the whole map over time
+-- => save bloat). Bring existing saves onto the passive-radar model: switch any
+-- active console back off (it stays an inactive teleporter doorway), and -- for
+-- teams that already researched platform-radar -- ensure an mts-passive-radar on
+-- every floor. The superseded MDW-local dw-hidden-radar prototype is removed, so
+-- its leftover entities are auto-deleted by the engine on load; we do not
+-- reference it here. Idempotent + nil-safe; a fresh save (no teams) is a no-op.
+local function migrate_passive_radars()
+    if not storage.teams then return end
+    for force_name, ctx in pairs(storage.teams) do
+        local floors = {}
+        local function add(s) if s and s.valid then floors[#floors + 1] = s end end
+        if ctx.warp and ctx.warp.current then add(ctx.warp.current.surface) end
+        if ctx.platform then
+            add(ctx.platform.factory and ctx.platform.factory.surface)
+            add(ctx.platform.mining  and ctx.platform.mining.surface)
+            add(ctx.platform.power   and ctx.platform.power.surface)
+        end
+        local has_radar = team_has_platform_radar(force_name)
+        for _, s in ipairs(floors) do
+            local console = s.find_entity(dw.entities.surface_radio_station.name,
+                                          dw.entities.surface_radio_station.position)
+            if console and console.valid and console.active then console.active = false end
+            if has_radar then dw.ensure_floor_radar(force_name, s, {0, 0}) end
+        end
+    end
+end
+dw.register_event('on_configuration_changed', migrate_passive_radars)

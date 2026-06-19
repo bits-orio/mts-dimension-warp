@@ -179,6 +179,7 @@ require "scripts.scenario.freeplay"
 require "scripts.scenario.victory"
 
 require "scripts.warp"
+require "scripts.warp_timer_label"
 require "scripts.enemies"
 
 require "scripts.entities.warpgate"

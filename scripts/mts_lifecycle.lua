@@ -157,8 +157,15 @@ local function on_team_clock_started(event)
     -- Researching warp-generator-1 arms it -- see scripts/warp.lua.
     ctx.timer.warp = ctx.timer.base
     ctx.timer.manual_warp = calculate_manual_warp_time(ctx)
-    dw.diag("on_team_clock_started: force=%s seeded timer.warp=%ss manual_warp=%ss (INACTIVE until warp-generator-1)",
-        force_name, tostring(ctx.timer.warp), tostring(ctx.timer.manual_warp))
+
+    -- The team clock has begun: if the team has not already armed its warp clock
+    -- (warp-generator-1), start the long eviction grace so it cannot farm the home
+    -- planet forever (lever 2; warp_timer force-warps when it expires).
+    if not ctx.timer.active then
+        ctx.timer.evict = dw.EVICT_GRACE_SECONDS
+    end
+    dw.diag("on_team_clock_started: force=%s seeded timer.warp=%ss manual_warp=%ss evict=%ss",
+        force_name, tostring(ctx.timer.warp), tostring(ctx.timer.manual_warp), tostring(ctx.timer.evict))
 end
 
 local function on_team_released(event)

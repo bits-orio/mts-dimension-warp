@@ -193,6 +193,13 @@ local function depart_to_dock(force_name, ctx, target)
     dw.update_surfaces_properties(force_name, ctx)   -- retire the old world (resets status to awaiting)
     dw.update_warp_platform_size(force_name, ctx)    -- re-lay platform tiles on the dock
 
+    -- #4: relink the warp-SIDE gate/stair handles invalidated by the dock clone
+    -- (new unit_numbers). The 'warp-to-factory' route teleports FROM the top-floor
+    -- radio station, which was just cloned -- without this the down-gates are dead
+    -- and you can't walk your floors while docked. Every other Arrive path runs
+    -- this; depart_to_dock omitted it. Before pause_team, so it acts on a live base.
+    dw.platform_force_update_entities(force_name, ctx)
+
     ctx.warp.docked = true
     ctx.warp.resume_chosen = false
     ctx.timer.dock = nil
@@ -239,6 +246,16 @@ local function warp_timer(force_name, ctx)
     if ctx.warp.docked then return end
 
     if not ctx.nauvis_lab_exploded then return end
+
+    -- Keep THIS team's manual-warp vote threshold current (#1): a fraction of its
+    -- connected members, min 1. The legacy flat storage.votes threshold was never
+    -- propagated to ctx.votes.min_vote (it stayed 1), so a multiplayer team could
+    -- commit a warp on a single click. Recompute per-team from live membership.
+    do
+        local f = game.forces[force_name]
+        local members = (f and f.valid) and #f.connected_players or 0
+        ctx.votes.min_vote = math.max(1, math.ceil(members * settings.global['dw-min-warp-voter'].value))
+    end
 
     if ctx.timer.active then
         if ctx.timer.warp >= 0 then
@@ -304,12 +321,47 @@ local function warp_timer(force_name, ctx)
                 post_arrive_reinit(force_name, ctx)
             end
         end
+    elseif ctx.timer.evict then
+        -- Eviction backstop (lever 2): a team that has NOT armed its warp clock
+        -- (never researched warp-generator-1) still gets force-warped after the
+        -- long grace, so it cannot farm the home planet forever. When the grace
+        -- expires we engage the clock (active=true) and set warp=0, so the active
+        -- branch above fires the warp next tick and owns warping from then on.
+        if ctx.timer.evict > 0 then
+            ctx.timer.evict = ctx.timer.evict - 1
+        end
+        if ctx.timer.evict <= 0 then
+            local force = game.forces[force_name]
+            ctx.timer.active = true
+            ctx.timer.evict = nil
+            ctx.timer.warp = 0
+            ctx.timer.manual_warp = ctx.timer.manual_warp or calculate_manual_warp_time(ctx)
+            if force and force.valid then force.print({"dw-messages.dimension-destabilized"}) end
+            dw.gui.update_manual_warp_button()
+            dw.diag("warp_timer[%s]: eviction grace expired -> warp clock engaged (forced warp)", force_name)
+        end
     end
 
     --- each seconds, we update the GUI
     dw.gui.update()
 end
 dw.warp.warp_timer = warp_timer
+
+-- Re-freeze a dock whose resume was interrupted by everyone leaving (#3c). Keep
+-- the SAME dock surface (re-docking decision): reset the resume choice + countdown,
+-- restore the cold stasis look (undoing the wake-from-stasis thaw), and re-pause so
+-- the parked base is frozen again. A returning member simply gets the resume prompt
+-- once more. pcall-guarded -- a visual or pause hiccup must not strand the loop.
+function dw.refreeze_dock(force_name, ctx)
+    ctx.warp.resume_chosen = false
+    ctx.timer.dock = nil
+    local dock = ctx.warp.current and ctx.warp.current.surface
+    pcall(dw.apply_dock_stasis, dock, ctx)
+    -- Re-pause now to avoid a powered window with nobody aboard (the
+    -- `not resume_chosen` self-heal below also covers this on the next tick).
+    local ok, paused = pcall(remote.call, 'mts-v1', 'is_team_paused', force_name)
+    if ok and not paused then pcall(remote.call, 'mts-v1', 'pause_team', force_name) end
+end
 
 -- P2 dock resume countdown. Drives a DOCKED team (warp_timer skips them). Idle
 -- until a member chooses resume (ctx.warp.resume_chosen -- set by the GUI button
@@ -335,6 +387,18 @@ local function dock_timer(force_name, ctx)
         return
     end
 
+    -- Re-dock guard (#3c): resume is in progress but every member has now left
+    -- (disconnected, or warped away as a spectator that then left). Re-FREEZE the
+    -- SAME dock rather than warping an empty base out or leaving it powered. A
+    -- returning member gets the resume prompt again. Spectator-aware: is_team_online
+    -- counts a member spectating another team, so this won't fire spuriously.
+    local ok_online, online = pcall(remote.call, 'mts-v1', 'is_team_online', force_name)
+    if ok_online and not online then
+        dw.refreeze_dock(force_name, ctx)
+        dw.diag("dock_timer[%s]: members left mid-resume -> re-froze existing dock", force_name)
+        return
+    end
+
     -- First tick after resume: thaw (instant power) + arm the countdown.
     if ctx.timer.dock == nil then
         remote.call('mts-v1', 'unpause_team', force_name)
@@ -352,6 +416,28 @@ local function dock_timer(force_name, ctx)
                     dw.safe_teleport(p, dock, {0, 0}, true)
                 end
             end
+        end
+
+        -- Wake from stasis (the grilled resume beat): as power returns the cold,
+        -- dim dock warms back to life. Kill the cold indigo wash, brighten the
+        -- frozen daytime, pulse a brief warm glow that fades on its own
+        -- (time_to_live -- no tick handler), and mark the moment with a soft cue.
+        if dock and dock.valid then
+            if ctx.warp.dock_tint_id then
+                local cold = rendering.get_object_by_id(ctx.warp.dock_tint_id)
+                if cold and cold.valid then cold.destroy() end
+                ctx.warp.dock_tint_id = nil
+            end
+            dock.daytime = 0.0
+            dock.freeze_daytime = true
+            local r = (ctx.platform.warp.size / 32 + 2) * 32
+            rendering.draw_rectangle{
+                color = {r = 0.55, g = 0.42, b = 0.20, a = 0.30},   -- warm amber thaw-flash
+                filled = true, draw_on_ground = true,
+                left_top = {-r, -r}, right_bottom = {r, r},
+                surface = dock, time_to_live = 45,                  -- ~0.75s, then gone
+            }
+            dock.play_sound{path = "dw-teleport"}
         end
         ctx.timer.dock = DOCK_FORCED_WARP_SECONDS
         if force and force.valid then
@@ -453,6 +539,7 @@ local function warp_generator_research(event)
         -- THE GATE: this team's warp timer comes online. force.print (NOT
         -- game.print) so one team's progress isn't broadcast to every team.
         ctx.timer.active = true
+        ctx.timer.evict = nil        -- the real clock supersedes the eviction backstop
         ctx.timer.manual_warp = calculate_manual_warp_time(ctx)
         force.print({"dw-messages.warp-generator-1"})
         dw.diag("warp-generator-1 researched: force=%s -> warp timer ARMED", force.name)

@@ -40,7 +40,9 @@ require 'prototypes.technologies.technology'
 require 'prototypes.entities.radio-station'
 require 'prototypes.entities.chest-pipe'
 require 'prototypes.entities.power-pole'
-require 'prototypes.entities.hidden-radar'
+-- The passive spectate radar now lives in MTS (prototypes/entities/passive-radar.lua,
+-- name "mts-passive-radar"), placed via the mts-v1 ensure_passive_radar interface,
+-- so BNM and MDW share one prototype. The old MDW-local dw-hidden-radar is removed.
 require 'prototypes.entities.factory-beacon'
 require 'prototypes.entities.warp-gate'
 require 'prototypes.entities.harvesters'

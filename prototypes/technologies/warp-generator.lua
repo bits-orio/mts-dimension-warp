@@ -60,7 +60,10 @@ local tech_warp_generator_2 = { -- 25min
     type = "technology", name = "warp-generator-2",
     icons = generate_icon("constant-speed.png", DGOLD),
     effects = {{ type = "nothing", effect_description = {"technology-description.warp-generator-efficiency"} }},
-    prerequisites = {"warp-generator-1-5", "radar"},
+    -- Depends on platform-radar (not vanilla radar): weaves the cheap early
+    -- spectate-radar tech into the warp ladder, so a team extending its planet
+    -- time past tier 1.5 makes its floors viewable as a side effect.
+    prerequisites = {"warp-generator-1-5", "platform-radar"},
     unit = {
         count = 100,
         ingredients = {
