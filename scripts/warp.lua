@@ -421,6 +421,26 @@ end
 -- warp-generator-1 it stays "dark": no warp button, no auto-warp countdown (the
 -- warp loop is wrapped in `if ctx.timer.active`), exactly DW's "build the
 -- generator first" onboarding.
+-- Auto-warp interval (minutes) per warp-generator tech. The full + .5 levels form
+-- one mandatory ladder (15..70 in 5-min steps; prereqs enforce the order in the
+-- prototypes). The interval is still computed MONOTONICALLY here -- only ever
+-- lengthens -- as defence in depth, so an out-of-order force/editor grant can
+-- never shorten a team's timer.
+local WARP_GENERATOR_MINUTES = {
+    ["warp-generator-1"]   = 15,
+    ["warp-generator-1-5"] = 20,
+    ["warp-generator-2"]   = 25,
+    ["warp-generator-2-5"] = 30,
+    ["warp-generator-3"]   = 35,
+    ["warp-generator-3-5"] = 40,
+    ["warp-generator-4"]   = 45,
+    ["warp-generator-4-5"] = 50,
+    ["warp-generator-5"]   = 55,
+    ["warp-generator-5-5"] = 60,
+    ["warp-generator-6"]   = 65,
+    ["warp-generator-6-5"] = 70,
+}
+
 local function warp_generator_research(event)
     local tech = event.research
     local force = tech.force
@@ -437,25 +457,25 @@ local function warp_generator_research(event)
         force.print({"dw-messages.warp-generator-1"})
         dw.diag("warp-generator-1 researched: force=%s -> warp timer ARMED", force.name)
     end
-    -- warp-generator-1 ALSO matches this %d+ block (level 1), so the interval is
-    -- seeded on gen-1 too -- byte-faithful to DW. Do NOT early-return above.
-    if string.match(tech.name, "warp%-generator%-%d+") then
-        if tech.level < 6 then
-            ctx.timer.base = (20 + (tech.level - 1) * 10) * 60
-        else
-            ctx.timer.base = ctx.timer.base + 30 * 60
+
+    local mins = WARP_GENERATOR_MINUTES[tech.name]
+    if mins then
+        local new_base = mins * 60
+        -- Monotonic: never shorten the interval, so skipping or out-of-order
+        -- research of the optional .5 steps is always safe.
+        if not ctx.timer.base or new_base > ctx.timer.base then
+            ctx.timer.base = new_base
         end
         -- Load-bearing seed: if warp-generator-1 is researched BEFORE
         -- on_team_clock_started fires (a staged-start team), this is the only
         -- thing making ctx.timer.warp non-nil when active flips true, so
-        -- warp_timer's `ctx.timer.warp >= 0` never compares nil. regate_existing_
-        -- teams backfills the same way. Do not remove.
+        -- warp_timer's `ctx.timer.warp >= 0` never compares nil.
         if not ctx.timer.warp then
             ctx.timer.warp = ctx.timer.base
         end
         dw.gui.update_manual_warp_button()
-        dw.diag("warp-generator-%d researched: force=%s -> timer.base=%ds",
-            tech.level, force.name, ctx.timer.base)
+        dw.diag("warp-generator %s researched: force=%s -> timer.base=%ds",
+            tech.name, force.name, ctx.timer.base)
     end
     if tech.name == "warp-preferred-planet" then
         ctx.gui.planet_selector_enabled = true

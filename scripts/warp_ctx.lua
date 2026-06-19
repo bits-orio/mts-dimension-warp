@@ -81,7 +81,7 @@ local function new_ctx()
         -- timers are in seconds, not ticks
         timer = {
             active = false,
-            base = 20 * 60, -- 20 min auto-warp
+            base = 15 * 60, -- 15 min auto-warp floor (warp-generator-1; grows with the generator techs)
             warp = nil,         -- countdown to the next warp
             manual_warp = nil,  -- player-vote warp countdown
             dock = nil,         -- P2: resume countdown (thaw -> forced warp out)
