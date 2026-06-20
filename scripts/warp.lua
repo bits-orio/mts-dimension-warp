@@ -242,17 +242,20 @@ end
 local function warp_timer(force_name, ctx)
     -- Skip a team MTS has paused: no warp clock, no ticking, no warp.
     if remote.call('mts-v1', 'is_team_paused', force_name) then
-        -- Only note the skip at the moment it actually matters: the warp clock has
-        -- expired and we WOULD have warped this tick were the team not paused.
-        -- Stays out of the idle path (a paused, mid-countdown team logs nothing).
-        if ctx.timer.active and ((not ctx.victory and ctx.timer.warp and ctx.timer.warp <= 0)
-            or (ctx.timer.manual_warp and ctx.timer.manual_warp <= 0)) then
+        -- Log once when we first hit a skip-worthy state; clear the flag when the team
+        -- unpauses (below) so a future pause re-logs. Avoids per-second spam when
+        -- warp=0 and the team stays paused indefinitely.
+        local skip_ready = ctx.timer.active and ((not ctx.victory and ctx.timer.warp and ctx.timer.warp <= 0)
+            or (ctx.timer.manual_warp and ctx.timer.manual_warp <= 0))
+        if skip_ready and not ctx.timer.skip_logged then
+            ctx.timer.skip_logged = true
             dw.diag("warp_timer[%s]: SKIP warp -- team paused (warp=%s manual=%s votes=%d/%d)",
                 force_name, tostring(ctx.timer.warp), tostring(ctx.timer.manual_warp),
                 ctx.votes.count, ctx.votes.min_vote)
         end
         return
     end
+    ctx.timer.skip_logged = nil  -- team unpaused; re-arm the one-shot log
 
     -- A docked team is driven by dock_timer, not the normal warp loop -- even
     -- after resume thaws power (unpauses), the dock countdown owns the warp.

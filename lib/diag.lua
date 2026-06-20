@@ -8,7 +8,7 @@
 
 dw = dw or {}
 
-local DIAG = true
+local DIAG = false
 
 --- Log a diagnostic line. Accepts a plain string, or a string.format pattern
 --- plus args:  dw.diag("warp %s -> %s", a, b)
