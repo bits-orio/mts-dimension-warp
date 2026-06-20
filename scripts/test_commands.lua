@@ -265,6 +265,12 @@ local function cmd_heal(command)
     if not player then return end
     local n = dw.reassert_surface_owners and dw.reassert_surface_owners() or 0
     player.print(string.format("[MDW heal] re-stamped ownership for %d surface(s) into MTS.", n))
+    -- Also sweep orphaned dock surfaces leaked by the historical retire-after-
+    -- ownership-wipe bug (disowned + undeleted docks not referenced by any team).
+    if dw.cleanup_orphan_dock_surfaces then
+        local cleaned = dw.cleanup_orphan_dock_surfaces()
+        player.print(string.format("[MDW heal] deleted %d orphaned dock surface(s).", cleaned))
+    end
     local fn = player.force.name
     if fn:find("^team%-") then
         local ok, list = pcall(remote.call, "mts-v1", "list_team_surfaces", fn)

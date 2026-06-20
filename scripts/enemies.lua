@@ -14,6 +14,20 @@ local function pollute(force_name, ctx)
 	-- instead -- logistic-science-pack requires warp-generator-1 -- so the home
 	-- planet never turns hostile before a team has established itself.
 	if not ctx.timer.active or ctx.victory then return end
+
+	-- A docked team is paused: its base is powerless and its current surface is
+	-- the empty starfield dock. Pollution dumped here has nothing to consume it,
+	-- so it just diffuses into virgin chunks and GENERATES them without bound --
+	-- the dock chunk/save bloat. Inject nothing while docked, AND clear any cloud
+	-- already on the dock so an existing (bloated) save self-heals: with the source
+	-- gone, a zeroed dock stops spreading pollution into new chunks. Pollution
+	-- pressure resumes naturally on warp-out.
+	if ctx.warp.docked then
+		local cur = ctx.warp.current and ctx.warp.current.surface
+		if cur and cur.valid then cur.clear_pollution() end
+		return
+	end
+
 	local pollution = 0
 
 	-- get platform pollution and clear it there
@@ -70,6 +84,9 @@ local function set_warp_evolution_factor(force_name, ctx)
 	end
 end
 dw.set_warp_evolution_factor = set_warp_evolution_factor
+
+-- Exposed for the selftest harness (scripts/selftest.lua).
+dw.pollute = pollute
 
 dw.register_team_tick(180, pollute)
 dw.register_team_tick(7200, force_enemy_attack)

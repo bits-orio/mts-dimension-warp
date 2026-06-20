@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.8.11
+Date: 20/06/2026
+  Bugfixes:
+    - Fixed major save/memory bloat (and the UPS drop it caused): a docked team kept dumping ever-growing pollution onto its parked dock surface every few seconds. With no factory there to consume it, the pollution spread outward forever, generating hundreds of thousands of empty chunks per dock (some docks reached 200k+ chunks, bloating the save to ~2 GB). Docked teams no longer pollute their dock, and any pollution already on a dock is cleared so existing saves recover on their own.
+    - Fixed a dock-surface leak: when a team warped out of a dock whose ownership had been lost (e.g. wiped by an older mod update), the dock was forgotten without being deleted, leaving an orphaned surface that hoarded its base copy and chunks forever. The retire path now deletes such a surface directly instead of silently dropping it.
+    - /mdw-heal now also sweeps away any orphaned dock surfaces left behind by the bug above. Run it once on an affected save, then /mts-trim, to reclaim the leaked chunks.
+---------------------------------------------------------------------------------------------------
 Version: 0.8.10
 Date: 20/06/2026
   Bugfixes:

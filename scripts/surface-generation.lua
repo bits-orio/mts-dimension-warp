@@ -298,22 +298,87 @@ local function update_surfaces_properties(force_name, ctx)
     -- still calls dw.update_surfaces_properties() with NO args at the end of its
     -- clone. That stale call is a safe no-op (guard below) -- the EXPECTED
     -- stale-aux divergence for v1; CORE drives the real retire with real args.
-    if type(ctx) ~= "table" or not ctx.warp then return end
-    if ctx.warp.status ~= defines.warp.warping then return end
+    if type(ctx) ~= "table" or not ctx.warp then return "noctx" end
+    if ctx.warp.status ~= defines.warp.warping then return "notwarping" end
 
     local previous = ctx.warp.previous
+    local result = "none"
     if previous and previous.surface and previous.surface.valid then
         dw.diag("update_surfaces_properties force=%s retiring previous=%s",
             force_name, dw.diag_surface(previous.surface))
         dw.clear_surface_owner(previous.surface.index)
         local retired = remote.call("mts-v1", "retire_team_surface", force_name, previous.name)
-        dw.diag("update_surfaces_properties force=%s retire_team_surface(%s) -> %s",
-            force_name, previous.name, tostring(retired))
+        if retired then
+            result = "retired"
+        else
+            -- MTS no longer owns the surface (e.g. its ownership was wiped by a
+            -- historical mod-update bug), so retire_team_surface refuses to delete
+            -- it and returns false -- leaving it disowned AND undeleted, i.e. a
+            -- permanent orphan still holding the cloned base and a pollution chunk
+            -- disk. We KNOW this is our own previous surface, so delete it directly.
+            if previous.surface.valid then game.delete_surface(previous.surface) end
+            result = "deleted_fallback"
+        end
+        dw.diag("update_surfaces_properties force=%s retire_team_surface(%s) -> %s (%s)",
+            force_name, previous.name, tostring(retired), result)
     else
         dw.diag("update_surfaces_properties force=%s no valid previous surface to retire",
             force_name)
     end
     ctx.warp.previous = nil
     ctx.warp.status = defines.warp.awaiting
+    return result
 end
 dw.update_surfaces_properties = update_surfaces_properties
+
+------------------------------------------------------------
+--- Orphaned-dock cleanup (repairs saves leaked by the historical bug)
+------------------------------------------------------------
+-- A dock surface only ever belongs to ONE team at a time (the team currently
+-- parked on it). A dock that is no longer referenced by ANY team's warp ctx is
+-- an orphan -- the dock-retire-after-ownership-wipe bug (see
+-- update_surfaces_properties above) could leave such a surface disowned AND
+-- undeleted, leaking its cloned base and pollution chunk disk forever.
+--
+-- This deletes every 'mdw-team-N-dock-wM' surface NOT referenced by a live team
+-- ctx. It is conservative: it only touches dock surfaces, and only ones absent
+-- from the live set (current / previous / dock_surface_name / platform floors of
+-- every team in storage.teams). Returns (count, names).
+--
+-- @param live_override table|nil  test seam: a {surface_name=true} set to use
+--                                 instead of computing from storage.teams.
+-- @param pattern       string|nil test seam: Lua pattern of surface names to
+--                                 consider (default all mdw team dock surfaces).
+function dw.cleanup_orphan_dock_surfaces(live_override, pattern)
+    pattern = pattern or "^mdw%-team%-%d+%-dock%-w"
+    local live = live_override
+    if not live then
+        live = {}
+        local function add(n) if type(n) == "string" then live[n] = true end end
+        for _, ctx in pairs(storage.teams or {}) do
+            if ctx.warp then
+                add(ctx.warp.current and ctx.warp.current.name)
+                add(ctx.warp.previous and ctx.warp.previous.name)
+                add(ctx.warp.dock_surface_name)
+            end
+            if ctx.platform then
+                for _, role in ipairs({"factory", "mining", "power"}) do
+                    local p = ctx.platform[role]
+                    if p and p.surface and p.surface.valid then add(p.surface.name) end
+                end
+            end
+        end
+    end
+
+    local names = {}
+    for _, s in pairs(game.surfaces) do
+        if s.valid and s.name:find(pattern) and not live[s.name] then
+            names[#names + 1] = s.name
+            dw.clear_surface_owner(s.index)
+            game.delete_surface(s)
+        end
+    end
+    dw.diag("cleanup_orphan_dock_surfaces: deleted %d orphan dock surface(s)%s",
+        #names, #names > 0 and (" -> " .. table.concat(names, ", ")) or "")
+    return #names, names
+end

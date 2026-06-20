@@ -193,4 +193,8 @@ require "compatibility.picker-dollies"
 -- Admin-only /mdw-* console commands to speedrun the warp flow while testing.
 require "scripts.test_commands"
 
+-- In-engine self-test harness (mdw-selftest remote interface) for the dock
+-- pollution-bloat + orphan-cleanup fixes.
+require "scripts.selftest"
+
 -- require "scripts.debug"
