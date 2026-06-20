@@ -540,6 +540,15 @@ local function update()
         local ctx = ctx_for_player(player)
         if not ctx then goto continue end
 
+        -- Skip until the team's warp #0 surface is adopted. A team is created (force
+        -- set, ctx made with the empty warp.current = {} default) a tick or more
+        -- before on_team_surface_created fills in current.planet/surface -- and a
+        -- player can already resolve to that ctx in that window, so the labels below
+        -- would concatenate a nil planet (gui.lua:553 crash).
+        if not (ctx.warp.current.planet and ctx.warp.current.surface and ctx.warp.current.surface.valid) then
+            goto continue
+        end
+
         local frame = get_warp_frame(player)
 
         local player_gui_settings = get_player_gui_settings(player)

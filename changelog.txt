@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.8.8
+Date: 19/06/2026
+  Bugfixes:
+    - Fixed a crash on the warp HUD in the brief moment just after a team is created, before its home world is adopted (the surface label tried to use a planet that was not set yet). The HUD now waits until the team's surface is ready.
+---------------------------------------------------------------------------------------------------
 Version: 0.8.7
 Date: 19/06/2026
   Bugfixes:
