@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.8.9
+Date: 20/06/2026
+  Bugfixes:
+    - Your factory/mining/power floors, dock and warp worlds could vanish from the Teams surface list (and stop being viewable by spectators) after a mod update. The team's surfaces are now re-registered with Multi-Team Support on load, so they stay listed. Requires Multi-Team Support 0.4.51 or newer.
+  Features:
+    - New /mdw-heal admin command: re-registers all of your team's surfaces with Multi-Team Support on demand, repairing the surface list / spectator view without a reload.
+---------------------------------------------------------------------------------------------------
 Version: 0.8.8
 Date: 19/06/2026
   Bugfixes:

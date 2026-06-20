@@ -232,6 +232,39 @@ function mts_lifecycle.setup()
         }
     end
     mts_lifecycle.register()
+    mts_lifecycle.reassert_surface_owners()
 end
+
+-- Re-stamp MTS ownership for every surface we still own.
+--
+-- MTS resolves surface ownership (visibility, spectator, radar, labels, the
+-- Teams GUI) from its own registry, which its planet_map.build() rebuilds from
+-- scratch on every on_configuration_changed -- historically dropping ownership of
+-- our ephemeral mdw-* worlds on each mod update. Our surface_index_to_force map
+-- lives in OUR storage and is never touched by MTS, so it is the durable source
+-- of truth. We run this from setup() (on_init / on_configuration_changed, after
+-- MTS's own build() has run) to re-assert ownership through the public mts-v1
+-- create_team_surface API. For a surface that already exists, MTS just re-stamps
+-- the owner and returns -- nothing is created -- so this is idempotent and also
+-- heals saves orphaned by the historical wipe.
+function mts_lifecycle.reassert_surface_owners()
+    local iface = remote.interfaces["mts-v1"]
+    if not (iface and iface.create_team_surface) then return 0 end
+    local owners = storage.surface_index_to_force
+    if not owners then return 0 end
+    local n = 0
+    for index, force_name in pairs(owners) do
+        local surface = game.surfaces[index]
+        if surface and surface.valid and game.forces[force_name] then
+            -- name-only spec: the surface exists, so MTS re-stamps and returns.
+            pcall(remote.call, "mts-v1", "create_team_surface", force_name, { name = surface.name })
+            n = n + 1
+        end
+    end
+    dw.diag("reassert_surface_owners re-stamped %d surface(s) after config/init", n)
+    return n
+end
+-- Expose for the /mdw-heal console command (manual repair without a config change).
+dw.reassert_surface_owners = mts_lifecycle.reassert_surface_owners
 
 return mts_lifecycle

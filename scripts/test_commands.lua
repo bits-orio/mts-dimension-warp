@@ -256,6 +256,25 @@ local function cmd_resume(command)
     player.print("[MDW test] resume chosen -> power thaws, forced warp out in ~60s. Watch /mdw-status timer.dock.")
 end
 
+-- /mdw-heal : re-assert this game's MDW surface ownership into MTS. Repairs the
+-- Teams GUI list / visibility / spectator / radar after an MTS ownership wipe
+-- (e.g. a pre-fix save, or any state where get_surface_owner returns nil). Runs
+-- for every team in one pass; safe + idempotent to run anytime.
+local function cmd_heal(command)
+    local player = resolve(command, false)
+    if not player then return end
+    local n = dw.reassert_surface_owners and dw.reassert_surface_owners() or 0
+    player.print(string.format("[MDW heal] re-stamped ownership for %d surface(s) into MTS.", n))
+    local fn = player.force.name
+    if fn:find("^team%-") then
+        local ok, list = pcall(remote.call, "mts-v1", "list_team_surfaces", fn)
+        if ok and type(list) == "table" then
+            player.print(string.format("[MDW heal] MTS now sees %d surface(s) owned by your team (%s).", #list, fn))
+        end
+    end
+end
+
+commands.add_command("mdw-heal",   "[MDW] re-assert MDW surface ownership to MTS (repair Teams GUI / visibility)", cmd_heal)
 commands.add_command("mdw-arm",    "[MDW test] research warp-generator-1 + unlock planets (arm warping)", cmd_arm)
 commands.add_command("mdw-warp",   "[MDW test] warp now [optional exact planet, e.g. nauvis]", cmd_warp)
 commands.add_command("mdw-warpx",  "[MDW test] warp <n> times in a row (max 10)", cmd_warpx)
