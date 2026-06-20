@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.8.10
+Date: 20/06/2026
+  Bugfixes:
+    - Fixed log file bloat: when a team's warp clock expired while the team was paused, a diagnostic line was written to the log every second indefinitely. The line is now written once when the condition is first detected and suppressed until the team unpauses.
+---------------------------------------------------------------------------------------------------
 Version: 0.8.9
 Date: 20/06/2026
   Bugfixes:
