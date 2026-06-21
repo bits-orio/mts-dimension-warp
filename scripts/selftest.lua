@@ -76,6 +76,18 @@ local function t_pollute_skips_docked()
         string.format("docked pollute -> total=%.0f (expect 0: no inject + cleared)", after)
 end
 
+-- CRASH GUARD: pollute() must not crash for an active team that has no valid
+-- current surface (mid-setup, or a surface recycled by a disband+slot reuse).
+local function t_pollute_no_surface_no_crash()
+    local ctx = {
+        timer = { active = true }, victory = false, pollution = 1000,
+        platform = { factory = {}, mining = {}, power = {} },
+        warp = { docked = false, current = {} },   -- current.surface == nil
+    }
+    local ok, err = pcall(dw.pollute, "team-selftest", ctx)
+    return ok, ok and "no crash with nil current surface" or ("CRASHED: " .. tostring(err))
+end
+
 -- REGRESSION: a live (non-docked) team's pollute() must still add pollution.
 local function t_pollute_runs_when_active()
     local s = make_surface("pollact")
@@ -120,13 +132,37 @@ local function t_cleanup_orphan_keeps_referenced()
         n, table.concat(names, ","), tostring(keep_alive))
 end
 
+-- BUG 3: disbanding a team must delete its mts-v1 surfaces (docks / warp worlds),
+-- which live only in MTS's surface_owner_overrides map -- not just the legacy
+-- 'team-N-' prefixed / variant-map surfaces. We drive a real disband_team through
+-- the mts-v1 API on a synthetic team and assert the surface's ownership was swept
+-- (owner -> nil). The actual surface delete is async; ownership clearing is the
+-- synchronous proof that cleanup_force_surfaces processed the override entry (and
+-- it always calls game.delete_surface alongside). End-to-end deletion is covered
+-- by the integration check on a real team.
+local function t_disband_sweeps_surface()
+    local fn = "team-77"
+    if not game.forces[fn] then game.create_force(fn) end
+    local nm = "mdw-team-77-dock-w" .. game.tick
+    remote.call("mts-v1", "create_team_surface", fn, { name = nm, planet = TEST_PLANET, map_gen_settings = mg() })
+    local existed      = game.surfaces[nm] ~= nil
+    local owner_before = remote.call("mts-v1", "get_surface_owner", nm)
+    remote.call("mts-v1", "disband_team", fn)
+    local owner_after  = remote.call("mts-v1", "get_surface_owner", nm)
+    local ok = (existed and owner_before == fn and owner_after == nil)
+    return ok, string.format("created=%s owner_before=%s owner_after=%s (expect true, %s, nil)",
+        tostring(existed), tostring(owner_before), tostring(owner_after), fn)
+end
+
 -- ── Runner ────────────────────────────────────────────────────────────
 
 local TESTS = {
     { "pollute_skips_docked",        t_pollute_skips_docked },
+    { "pollute_no_surface_no_crash", t_pollute_no_surface_no_crash },
     { "pollute_runs_when_active",    t_pollute_runs_when_active },
     { "retire_fallback_on_unowned",  t_retire_fallback_on_unowned },
     { "cleanup_orphan_keeps_kept",   t_cleanup_orphan_keeps_referenced },
+    { "disband_sweeps_surface",      t_disband_sweeps_surface },
 }
 
 function dw.run_selftest()

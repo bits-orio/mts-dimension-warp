@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.8.12
+Date: 21/06/2026
+  Bugfixes:
+    - Fixed a non-recoverable crash in the pollution tick (enemies.lua:46 "attempt to index field 'surface'") that could take down the server. It fired for a team whose warp clock was armed but which had no valid current surface -- a state that can occur mid-setup, or when a team's surface was recycled after a disband. The pollution and forced-attack ticks now skip such a team instead of crashing.
+---------------------------------------------------------------------------------------------------
 Version: 0.8.11
 Date: 20/06/2026
   Bugfixes:

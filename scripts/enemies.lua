@@ -15,6 +15,13 @@ local function pollute(force_name, ctx)
 	-- planet never turns hostile before a team has established itself.
 	if not ctx.timer.active or ctx.victory then return end
 
+	-- No valid current surface (team mid-setup before warp #0 is adopted, or one
+	-- whose surface was recycled/torn down -- e.g. after a disband+slot reuse):
+	-- there is nothing to clear or pollute, so skip rather than crash on the
+	-- ctx.warp.current.surface access below.
+	local current = ctx.warp.current and ctx.warp.current.surface
+	if not (current and current.valid) then return end
+
 	-- A docked team is paused: its base is powerless and its current surface is
 	-- the empty starfield dock. Pollution dumped here has nothing to consume it,
 	-- so it just diffuses into virgin chunks and GENERATES them without bound --
@@ -54,7 +61,9 @@ local function force_enemy_attack(force_name, ctx)
 	if ctx.warp.number < force_attack_wave then return end
 	local time_passed = (game.tick - ctx.warp.time) / 3600
 	if time_passed <= 10 then return end --- at least 10min on planet
-	ctx.warp.current.surface.set_multi_command{
+	local current = ctx.warp.current and ctx.warp.current.surface
+	if not (current and current.valid) then return end
+	current.set_multi_command{
 		command = {
 			type = defines.command.attack_area,
 			destination = {0, 0},
