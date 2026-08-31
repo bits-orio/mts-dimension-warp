@@ -41,7 +41,7 @@ This mod stands on a chain of work, with gratitude to every link:
 
 MTS Dimension Warp is licensed under the **MIT License** — see [LICENSE](LICENSE). That covers the code; bundled third-party assets keep their own licenses, listed under Credits.
 
-It is a derivative work of Dimension Warp, which is **BSD 3-Clause** © 2025 Guillaume ("Anakhon"). The original BSD license is retained verbatim in [LICENSE.dimension-warp](LICENSE.dimension-warp), and the provenance is recorded in [NOTICE](NOTICE). Per the BSD license's third clause, the names "Dimension Warp", "Guillaume", and "Anakhon" are not used to endorse or promote this fork.
+It is a derivative work of Dimension Warp, which is **BSD 3-Clause** © 2025 Guillaume ("Anakhon"). The original BSD license is retained verbatim in [LICENSE.dimension-warp](LICENSE.dimension-warp), and the provenance is recorded in [NOTICE](NOTICE). The fork was made with Anakhon's knowledge and encouragement — raised with them before anything shipped, and welcomed.
 
 ## Credits & thanks
 

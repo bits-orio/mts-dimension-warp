@@ -1,7 +1,7 @@
 {
   "mod": "mts-dimension-warp",
   "title": "MTS Dimension Warp",
-  "summary": "Requires Multi-Team Support: every team warps its own base, on its own clock, through its own deterministic sequence of dimensions, racing to stabilize them. Strip each world for what you can carry before the platform jumps. Two teams that reach the same planet at the same warp number face the identical world, so nobody wins on luck. A fork of Dimension Warp by Anakhon (BSD-3-Clause), rebuilt on the MTS mts-v1 API.",
+  "summary": "Requires Multi-Team Support. Every team warps its own base, on its own clock, through its own deterministic sequence of dimensions, racing to stabilize them. Strip each world for what you can carry before the platform jumps. A fork of Dimension Warp by Anakhon (BSD-3-Clause), rebuilt on the MTS mts-v1 API.",
   "category": "overhaul",
   "tags": [
     "planets",
