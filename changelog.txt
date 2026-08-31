@@ -1,4 +1,14 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.8.13
+Date: 31/08/2026
+  Info:
+    - Relicensed from GPLv3 to MIT. The upstream Dimension Warp portions remain BSD 3-Clause:
+      LICENSE.dimension-warp and the original copyright notice are unchanged, as that licence
+      requires. NOTICE had still declared the mod GPLv3 and is corrected.
+    - NOTICE and the mod page now record that this fork was made with the original author's
+      knowledge and encouragement, replacing the recital of the BSD non-endorsement clause.
+      A blessing is not a licence waiver, so the attribution itself is untouched.
+---------------------------------------------------------------------------------------------------
 Version: 0.8.12
 Date: 21/06/2026
   Bugfixes:

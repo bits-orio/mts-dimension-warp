@@ -130,6 +130,7 @@ jobs:
                    --exclude='.gitignore' \
                    --exclude='.luarc.json' \
                    --exclude='tools' \
+                   --exclude='docs/portal.md' \
                    --exclude='*.sh' \
                    --exclude='*.py' \
                    --exclude='*.bat' \
