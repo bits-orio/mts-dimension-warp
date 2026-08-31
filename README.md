@@ -1,6 +1,6 @@
 # MTS Dimension Warp
 
-Per-team Dimension Warp for Multi-Team Support. Every team builds on a platform that warps between dimensions on its own clock, racing to stabilize them — same start, different finish.
+Per-team Dimension Warp for Multi-Team Support. Every team builds on a platform that warps between dimensions on its own clock, racing to stabilize them.
 
 > **Status:** early development. The per-team foundation is being built on top of Dimension Warp's mechanics.
 
