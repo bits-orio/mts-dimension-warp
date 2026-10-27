@@ -223,18 +223,15 @@ local function depart_to_dock(force_name, ctx, target)
 end
 dw.warp.depart_to_dock = depart_to_dock
 
--- Re-tile the platforms and relink the warp-SIDE stair/gate handles after an
--- Arrive: the platform clone gives those entities new unit_numbers, so the
--- dimension<->surface stairs and the warp gate must be re-found (the dimension
--- side lives on un-cloned surfaces and persists). Shared by the online warp loop
--- and the dock resume warp-out so both preserve aux infrastructure across a jump.
--- (harvester place_harvester_tiles is still flat -- threaded in S6.)
+-- Relink the warp-SIDE stair/gate handles after an Arrive: the platform clone
+-- gives those entities new unit_numbers, so the dimension<->surface stairs and
+-- the warp gate must be re-found (the dimension side lives on un-cloned surfaces
+-- and persists). Shared by the online warp loop and the dock resume warp-out so
+-- both preserve aux infrastructure across a jump.
+-- The floors are not re-laid here: they are laid when created and when research
+-- grows them, and a warp never touches them. Re-laying them on every warp only
+-- repaired explosion damage (cosmetic) and wiped any concrete players had laid.
 local function post_arrive_reinit(force_name, ctx)
-    if ctx.platform.factory.surface then dw.platforms.init_update_factory_platform(force_name, ctx) end
-    if ctx.harvesters.left.gate then dw.platforms.place_harvester_tiles(force_name, ctx, "left") end
-    if ctx.harvesters.right.gate then dw.platforms.place_harvester_tiles(force_name, ctx, "right") end
-    if ctx.platform.mining.surface then dw.platforms.init_update_mining_platform(force_name, ctx) end
-    if ctx.platform.power.surface then dw.platforms.init_update_power_platform(force_name, ctx) end
     dw.platform_force_update_entities(force_name, ctx)
 end
 
