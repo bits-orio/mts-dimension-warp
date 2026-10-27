@@ -5,6 +5,14 @@
 -- forced attacks therefore run once per team against that team's ctx, driven by
 -- dw.register_team_tick rather than a single global on_nth_tick handler.
 
+--- A team MTS has paused (an admin pause, or a docked base) has no power to
+--- defend itself: no pollution is pushed onto its world and no attack is forced,
+--- and the pressure does not build up meanwhile. The warp clock stops the same way.
+local function team_paused(force_name)
+	local ok, paused = pcall(remote.call, "mts-v1", "is_team_paused", force_name)
+	return ok and paused
+end
+
 --- Remove pollution from a team's platform surfaces and add it to that team's
 --- accumulated value, then pollute the warp surface (to trigger bases & cie)
 --- based on warptorio original formula, as it was already really good.
@@ -34,6 +42,7 @@ local function pollute(force_name, ctx)
 		if cur and cur.valid then cur.clear_pollution() end
 		return
 	end
+	if team_paused(force_name) then return end
 
 	local pollution = 0
 
@@ -59,6 +68,7 @@ local function force_enemy_attack(force_name, ctx)
 	local force_attack_wave = settings.global['dw-helper-enemy-force-attack'].value
 	if not ctx.timer.active then return end
 	if ctx.warp.number < force_attack_wave then return end
+	if team_paused(force_name) then return end
 	local time_passed = (game.tick - ctx.warp.time) / 3600
 	if time_passed <= 10 then return end --- at least 10min on planet
 	local current = ctx.warp.current and ctx.warp.current.surface
