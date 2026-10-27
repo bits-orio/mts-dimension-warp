@@ -27,6 +27,10 @@ pipetoground.name = "dw-pipe"
 pipetoground.minable = nil
 pipetoground.placeable_by = nil
 pipetoground.fast_replaceable_group = nil
+-- Stairs never freeze, like the stair loaders: since Factorio 2.1.21 an Aquilo
+-- world freezes every unheated entity that has heating_energy, and this copy of
+-- the vanilla pipe-to-ground inherited 150kW of it.
+pipetoground.heating_energy = nil
 pipetoground.fluid_box = {
     pipe_connections = {
         -- hide_connection_info moved from the fluid box to each connection in Factorio 2.1.
