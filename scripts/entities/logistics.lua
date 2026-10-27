@@ -153,7 +153,7 @@ local function create_pipe_pairs(force_name, ctx, surface_A, surface_B, position
         }
         pipe_B.destructible = false
 
-        pipe_A.fluidbox.add_linked_connection(0, pipe_B, 0)
+        utils.link_pipes(pipe_A, pipe_B)
         ctx.stairs.pipe_pairs[pipe_index] = {A = pipe_A, B = pipe_B}
         ::continue::
     end

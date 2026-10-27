@@ -192,7 +192,8 @@ dw.create_loader = function (loader_name, params)
     local recipe = {
         type = 'recipe',
         name = loader_name,
-        category = params.recipe_category or "advanced-crafting",
+        -- Factorio 2.1 merged category and additional_categories into one list.
+        categories = params.recipe_categories or {"advanced-crafting"},
         ingredients = params.ingredients,
         enabled = false,
         results = {

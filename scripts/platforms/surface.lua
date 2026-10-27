@@ -315,7 +315,7 @@ local function relink_pipes(ctx, surface, positions_list)
 
         if pipe[1] and ctx.stairs.pipe_pairs[index].B and ctx.stairs.pipe_pairs[index].B.valid then
             ctx.stairs.pipe_pairs[index].A = pipe[1]
-            pipe[1].fluidbox.add_linked_connection(0, ctx.stairs.pipe_pairs[index].B, 0)
+            utils.link_pipes(pipe[1], ctx.stairs.pipe_pairs[index].B)
         end
         ::continue::
     end
@@ -478,7 +478,7 @@ local function migrate_passive_radars()
         for _, s in ipairs(floors) do
             local console = s.find_entity(dw.entities.surface_radio_station.name,
                                           dw.entities.surface_radio_station.position)
-            if console and console.valid and console.active then console.active = false end
+            if console and console.valid and not console.disabled_by_script then console.disabled_by_script = true end
             if has_radar then dw.ensure_floor_radar(force_name, s, {0, 0}) end
         end
     end

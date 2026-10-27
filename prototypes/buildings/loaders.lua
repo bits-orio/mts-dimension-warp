@@ -13,7 +13,7 @@ local template = {
         },
         tech = 'logistics',
         next = "dw-fast-loader",
-        recipe_category = mods['space-age'] and "pressing" or "crafting",
+        recipe_categories = mods['space-age'] and {"crafting", "metallurgy"} or {"crafting"},
     },
 
     ['fast-loader'] = {
@@ -30,7 +30,7 @@ local template = {
         },
         tech = 'logistics-2',
         next = "dw-express-loader",
-        recipe_category = mods['space-age'] and "pressing" or "crafting",
+        recipe_categories = mods['space-age'] and {"crafting", "metallurgy"} or {"crafting"},
     },
 
     ['express-loader'] = {
@@ -47,8 +47,9 @@ local template = {
             {type = "fluid", name = "lubricant", amount = 100}
         },
         tech = 'logistics-3',
-        next = mods['space-age'] and "dw-turbo-loader" or "",
-        recipe_category = mods['space-age'] and "crafting-with-fluid-or-metallurgy" or "crafting-with-fluid",
+        -- nil, not "": 2.1 rejects an empty upgrade target at load.
+        next = mods['space-age'] and "dw-turbo-loader" or nil,
+        recipe_categories = mods['space-age'] and {"crafting-with-fluid", "metallurgy"} or {"crafting-with-fluid"},
     },
 
     ['turbo-loader'] = {
@@ -66,7 +67,7 @@ local template = {
             {type = "fluid", name = "lubricant", amount = 160}
         },
         tech = 'turbo-transport-belt',
-        recipe_category = mods['space-age'] and "crafting-with-fluid-or-metallurgy" or "crafting-with-fluid",
+        recipe_categories = mods['space-age'] and {"crafting-with-fluid", "metallurgy"} or {"crafting-with-fluid"},
     },
 
 }

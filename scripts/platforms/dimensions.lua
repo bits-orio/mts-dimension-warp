@@ -90,7 +90,8 @@ local function create_warp_factory_teleporters_logistic(force_name, ctx)
     end
     local gate_1 = create_special_entity(ctx.platform.factory.surface, dw.entities.gate_factory_surface, true, force)
     local gate_2 = create_special_entity(ctx.warp.current.surface, dw.entities.surface_radio_station, true, force)
-    gate_2.active = false
+    -- LuaEntity::active is read-only since Factorio 2.1; disabled_by_script is the write.
+    gate_2.disabled_by_script = true
     utils.link_gates(ctx, "factory-to-warp", "warp-to-factory", gate_1, gate_2)
     utils.link_cables(gate_1, gate_2, defines.wire_connectors.logic)
 

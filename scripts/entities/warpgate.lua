@@ -148,7 +148,7 @@ local function link_warp_gate(force_name, ctx, mobile_chests, mobile_loaders, mo
 
         ctx.stairs.pipe_pairs[pipe_index].B = mobile_pipes and mobile_pipes[i]
         if ctx.stairs.pipe_pairs[pipe_index].B and ctx.stairs.pipe_pairs[pipe_index].A then
-            ctx.stairs.pipe_pairs[pipe_index].A.fluidbox.add_linked_connection(0, ctx.stairs.pipe_pairs[pipe_index].B, 0)
+            utils.link_pipes(ctx.stairs.pipe_pairs[pipe_index].A, ctx.stairs.pipe_pairs[pipe_index].B)
         end
     end
 end

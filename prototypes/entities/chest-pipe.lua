@@ -29,11 +29,11 @@ pipetoground.placeable_by = nil
 pipetoground.fast_replaceable_group = nil
 pipetoground.fluid_box = {
     pipe_connections = {
-        { position = {0, 0}, direction = defines.direction.north, connection_type = "normal"}, -- default
-        { position = {0, 0}, direction = defines.direction.south, connection_type = "linked", linked_connection_id = 0,}
+        -- hide_connection_info moved from the fluid box to each connection in Factorio 2.1.
+        { position = {0, 0}, direction = defines.direction.north, connection_type = "normal", hide_connection_info = true}, -- default
+        { position = {0, 0}, direction = defines.direction.south, connection_type = "linked", linked_connection_id = 0, hide_connection_info = true}
     },
     max_pipeline_extent = 25000,
-    hide_connection_info = true,
     volume = 100,
     pipe_covers = pipecoverspictures(),
 }

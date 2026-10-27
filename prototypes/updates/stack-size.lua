@@ -59,7 +59,8 @@ data.raw.item["barrel"].stack_size = 20
 data.raw.item["explosives"].stack_size = stack_size_value
 data.raw.item["stone-wall"].stack_size = stack_size_value
 data.raw.item["landfill"].stack_size = stack_size_value
-data.raw.tool["space-science-pack"].stack_size = 1000
+-- Science packs are plain items since Factorio 2.1.
+data.raw.item["space-science-pack"].stack_size = 1000
 
 
 if mods['space-age'] then

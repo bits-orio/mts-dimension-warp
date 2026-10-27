@@ -18,5 +18,6 @@ data.raw.item["biter-egg"].spoil_ticks = 1 * 3600 * 60
 data.raw.item["pentapod-egg"].spoil_ticks = 30 * 60 * 60
 
 -- agricultural science pack has no more spoilage, considering the difficulty related to gleba / the mod
-data.raw.tool["agricultural-science-pack"].spoil_ticks = 0
-data.raw.tool["agricultural-science-pack"].spoil_result = nil
+-- (science packs are plain items since Factorio 2.1)
+data.raw.item["agricultural-science-pack"].spoil_ticks = 0
+data.raw.item["agricultural-science-pack"].spoil_result = nil

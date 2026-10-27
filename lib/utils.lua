@@ -66,12 +66,21 @@ end
 
 --- source: factorissimo-2-notnotmelon
 --- modified to feat the mod needs
+--- Factorio 2.1 binds a track to a list of planets (AmbientSound::planets); the
+--- single `planet` field of 2.0 is gone.
+local function plays_on(music, planet_name)
+    for _, name in pairs(music.planets or {}) do
+        if name == planet_name then return true end
+    end
+    return false
+end
+
 function utils.add_music(source_planet, destination_planet)
     for _, music in pairs(data.raw["ambient-sound"]) do
-        if music.planet == source_planet.name or (music.track_type == "hero-track" and music.name:find(source_planet.name)) then
+        if plays_on(music, source_planet.name) or (music.track_type == "hero-track" and music.name:find(source_planet.name)) then
             local new_music = table.deepcopy(music)
             new_music.name = music.name .. "-" .. destination_planet.name
-            new_music.planet = destination_planet.name
+            new_music.planets = {destination_planet.name}
             if new_music.track_type == "hero-track" then
                 new_music.track_type = "main-track"
                 new_music.weight = 10
@@ -134,6 +143,14 @@ function utils.link_cables(entity1, entity2, wire_connectors)
             entity1_connector.connect_to(entity2_connector, false, defines.wire_origin.script)
         end
     end
+end
+
+--- Join two dw-pipe ends (linked connection id 0 on both) across surfaces.
+--- Factorio 2.1 removed LuaFluidBox: linked fluid connections now live on the
+--- entity. The link is stored as (entity, id, other entity, other id), so a clone
+--- made by clone_area does not carry it; callers relink after a warp.
+function utils.link_pipes(pipe_a, pipe_b)
+    pipe_a.add_fluid_box_linked_connection(0, pipe_b, 0)
 end
 
 function utils.spill_or_return_item(event)
