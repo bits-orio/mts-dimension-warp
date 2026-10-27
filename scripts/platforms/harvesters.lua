@@ -316,11 +316,17 @@ local function recall_harvester(force_name, ctx, side)
     if not ctx.harvesters[side].deployed then return end
     local surface = ctx.warp.current.surface
     local deployed_area = ctx.harvesters[side].area
-    local deployed_center = ctx.harvesters[side].mobile.position
+    -- The harvester entity, its marker or its pole may already be gone (platform
+    -- growth deletes what the new floor covers); recall from the deployed area's
+    -- centre then, instead of stopping on the dead handle. (Upstream Dimension
+    -- Warp a494ea7 and 0fd7922, ported per team.)
+    local mobile = ctx.harvesters[side].mobile
+    local deployed_center = utils.is_nil_or_invalid(mobile)
+        and math2d.bounding_box.get_centre(deployed_area) or mobile.position
 
     -- remove entities we don't want to teleport back
-    ctx.harvesters[side].rectangle.destroy()
-    ctx.harvesters[side].mobile_pole.destroy()
+    if not utils.is_nil_or_invalid(ctx.harvesters[side].rectangle) then ctx.harvesters[side].rectangle.destroy() end
+    if not utils.is_nil_or_invalid(ctx.harvesters[side].mobile_pole) then ctx.harvesters[side].mobile_pole.destroy() end
 
     -- find all entities we want to teleport back to harvester zone
     local harvester_entities = surface.find_entities_filtered {
@@ -355,7 +361,7 @@ local function recall_harvester(force_name, ctx, side)
         h_entity.destroy{raise_destroy = true}
     end
 
-    ctx.harvesters[side].mobile.destroy()
+    if not utils.is_nil_or_invalid(mobile) then mobile.destroy() end
     ctx.harvesters[side].deployed = false
     link_harvester_pipe_chest(force_name, ctx, side)
 end

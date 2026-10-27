@@ -22,6 +22,26 @@ local function update_warp_platform_size(force_name, ctx)
     utils.add_tiles(tiles, "warp-platform", new_platform_area.left_top, new_platform_area.right_bottom)
 
     local filter_area = math2d.bounding_box.create_from_centre({0, 0}, size)
+
+    -- Deployables the new floor covers go home first: set_tiles deletes what
+    -- collides with the platform, a deployed harvester included, and the next
+    -- recall then stopped on the dead handle. (Upstream Dimension Warp 365d8fb
+    -- and a494ea7, ported per team; the gate's own box is checked too.)
+    local gate = ctx.warpgate.mobile_gate
+    if gate and gate.valid then
+        local strip = math2d.bounding_box.create_from_centre({gate.position.x, gate.position.y + 0.5}, 10, 2)
+        if math2d.bounding_box.collides_with(filter_area, strip)
+           or math2d.bounding_box.collides_with(filter_area, gate.bounding_box) then
+            gate.destroy{raise_destroy = true}
+        end
+    end
+    for _, side in pairs({"left", "right"}) do
+        local harvester = ctx.harvesters[side]
+        if harvester.deployed and harvester.area and math2d.bounding_box.collides_with(filter_area, harvester.area) then
+            dw.platforms.recall_harvester(force_name, ctx, side)
+        end
+    end
+
     local stuff_to_remove = surface.find_entities_filtered {
         area = filter_area,
         force = {force_name, "enemy"},

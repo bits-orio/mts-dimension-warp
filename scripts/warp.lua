@@ -160,6 +160,19 @@ local function team_is_online(force_name, ctx)
     return online and true or false
 end
 
+-- Stow the mobile gate and recall both harvesters before the base leaves its
+-- world: they stand on that world, which the warp retires, so anything left
+-- deployed would be destroyed and leave ctx.harvesters pointing at dead entities.
+-- Every departure runs this: the online warp, the dock departure and the dock's
+-- forced warp-out. ctx.warp.current must still be the world being left.
+local function pack_deployables(force_name, ctx)
+    if ctx.warpgate.mobile_gate then
+        ctx.warpgate.mobile_gate.destroy{raise_destroy=true}
+    end
+    dw.platforms.recall_harvester(force_name, ctx, "left")
+    dw.platforms.recall_harvester(force_name, ctx, "right")
+end
+
 -- Park the platform on its on-demand safe dock surface instead of warping to a
 -- hostile, undefended world (ADR-0006). Mirrors prepare_warp_to_next_surface,
 -- but creates a dock surface, freezes the team via MTS pause, and DEFERS the
@@ -178,11 +191,7 @@ local function depart_to_dock(force_name, ctx, target)
     -- destroy a deployed harvester and leave ctx.harvesters[side] pointing at dead
     -- entities. ctx.warp.current is still the old world here (generate_dock_surface
     -- advances it below), so recall reads the correct surface.
-    if ctx.warpgate.mobile_gate then
-        ctx.warpgate.mobile_gate.destroy{raise_destroy=true}
-    end
-    dw.platforms.recall_harvester(force_name, ctx, "left")
-    dw.platforms.recall_harvester(force_name, ctx, "right")
+    pack_deployables(force_name, ctx)
 
     if not dw.generate_dock_surface(force_name, ctx) then
         dw.diag("depart_to_dock[%s]: generate_dock_surface=false -> rollback", force_name)
@@ -312,14 +321,9 @@ local function warp_timer(force_name, ctx)
                 dw.diag("warp_timer[%s]: nobody online -> DEPART TO DOCK (deferred=%s)", force_name, tostring(target))
                 depart_to_dock(force_name, ctx, target)
             else
-                -- return warp gate
-                if ctx.warpgate.mobile_gate then
-                    ctx.warpgate.mobile_gate.destroy{raise_destroy=true}
-                end
-                -- harvesters recall (pack them back onto the mining platform
-                -- BEFORE prepare_warp retires the old warp surface they sit on)
-                dw.platforms.recall_harvester(force_name, ctx, "left")
-                dw.platforms.recall_harvester(force_name, ctx, "right")
+                -- return the warp gate and the harvesters BEFORE prepare_warp
+                -- retires the old warp surface they sit on
+                pack_deployables(force_name, ctx)
 
                 -- generate new surface and teleport. If no new world was made (MTS
                 -- refused the surface), the team has not moved: skip the arrival
@@ -472,6 +476,9 @@ local function dock_timer(force_name, ctx)
         -- transiently, and tearing down first would strand the team unpaused on a
         -- leaked dock with the deferred destination lost.
         ctx.warp.status = defines.warp.awaiting
+        -- anything deployed on the dock while resuming stands on the world the
+        -- warp-out retires, as on any other departure
+        pack_deployables(force_name, ctx)
         if prepare_warp_to_next_surface(force_name, ctx, target) then
             -- Arrived: the dock became 'previous' and was retired. Clear dock state.
             ctx.warp.docked = false
