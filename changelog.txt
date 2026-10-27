@@ -1,4 +1,38 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.9.0
+Date: 27/10/2026
+  Major Features:
+    - Runs on Factorio 2.1 (2.1.21 or newer) and needs Multi-Team Support 0.7.9. A 0.8.x save from
+      Factorio 2.0 loads with its warp, floors and stairs, docked or not.
+    - With Space Age, a warp world on Aquilo is a real Aquilo: every building that is not heated
+      freezes. On each arrival the team is told what freezes and what does not. The new setting
+      "Warp: Freezing on heating planets" turns it off, which plays as on Factorio 2.0.
+  Changes:
+    - A script error in one team's warp handlers no longer stops the server. That handler is
+      switched off for that team only, the team is told, and the next mod update switches it back
+      on.
+    - Floors are no longer re-laid on every warp, so concrete laid on a floor stays.
+    - A member left behind on the old world is announced to their own team only.
+    - Biters still expand one settler at a time under Factorio 2.1's new expansion rules.
+  Bugfixes:
+    - Two teams that reach the same planet at the same warp number get the identical world again.
+      The seed had taken in the team's own copy of the planet.
+    - A member looking at the map during a warp no longer ends up on Nauvis.
+    - Reconnecting keeps a member where they logged out, instead of moving them to the platform.
+    - Joining a server after a mod update no longer fails on mismatched script events.
+    - Platform growth no longer destroys a deployed harvester or the mobile gate.
+    - Stowing the mobile gate keeps the items in its chests.
+    - Stair pipes no longer freeze on Aquilo and keep their fluid when more stairs are researched.
+    - Steam engines, turbines and thrusters on a long fluid line keep running under Factorio 2.1's
+      pipeline extent rule.
+    - A team paused by an admin no longer gets pollution or forced biter attacks.
+    - The warp panel names the team's planet instead of showing an unknown key.
+    - AAI Containers' robot door animation is found where Factorio 2.1 keeps it.
+  Optimizations:
+    - The stairs relay moves items with one engine call, about 80 times faster per idle chest pair.
+    - The warp panel refreshes only for the warping team's players, about 12 times cheaper each.
+    - The item watchdog skips its scan when the team watches nothing.
+---------------------------------------------------------------------------------------------------
 Version: 0.8.13
 Date: 31/08/2026
   Info:
