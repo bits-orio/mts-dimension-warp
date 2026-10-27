@@ -65,10 +65,28 @@ local function create_entities_relative_to_position(force_name, ctx, surface, en
         -- transfer chest inventory if we saved one
         if mobile and mobile_type == "chest" then
             local index = positions[i][1] .. positions[i][2]
-            if ctx.warpgate.mobile_chests[index] then
+            local held = ctx.warpgate.mobile_chests[index]
+            if held then
                 local inventory = entity.get_inventory(defines.inventory.chest)
-                for stackindex = 1, #ctx.warpgate.mobile_chests[index], 1 do
-                    inventory.insert(ctx.warpgate.mobile_chests[index][stackindex])
+                if type(held) == "table" then
+                    -- a snapshot saved by an earlier version: stack descriptions
+                    for stackindex = 1, #held, 1 do
+                        inventory.insert(held[stackindex])
+                    end
+                else
+                    -- the held stacks, data and all; anything the chest cannot
+                    -- take is spilled next to it rather than lost
+                    for s = 1, #held do
+                        local stack = held[s]
+                        if stack.valid_for_read then
+                            local moved = inventory.insert(stack)
+                            if moved < stack.count then
+                                stack.count = stack.count - moved
+                                surface.spill_item_stack{position = entity.position, stack = stack, force = force, allow_belts = false}
+                            end
+                        end
+                    end
+                    held.destroy()
                 end
                 ctx.warpgate.mobile_chests[index] = nil
             end
@@ -341,20 +359,15 @@ local function mobile_gate_removed_killed(event)
         if chest then
             local inventory = chest.get_inventory(defines.inventory.chest)
             if inventory and not inventory.is_empty() then
-                ctx.warpgate.mobile_chests[index] = {}
-                for i = 1, #inventory, 1 do
-                    if inventory[i].valid_for_read then
-                        table.insert(ctx.warpgate.mobile_chests[index], {
-                            name = inventory[i].name,
-                            type = inventory[i].type,
-                            count = inventory[i].count,
-                            health = inventory[i].health,
-                            quality = inventory[i].quality,
-                            spoil_tick = inventory[i].spoil_tick,
-                            spoil_percent = inventory[i].spoil_percent,
-                        })
-                    end
+                -- Hold the stacks themselves in a script inventory. Moving a stack
+                -- keeps everything on it (a magazine's rounds, a tool's wear, tags,
+                -- an armor's grid); a name and count snapshot came back as full
+                -- magazines and new repair packs.
+                local held = game.create_inventory(#inventory)
+                for s = 1, #inventory do
+                    if inventory[s].valid_for_read then held[s].transfer_stack(inventory[s]) end
                 end
+                ctx.warpgate.mobile_chests[index] = held
             end
             chest.destroy()
         end
