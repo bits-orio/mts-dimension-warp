@@ -130,7 +130,10 @@ local function create_pipe_pairs(force_name, ctx, surface_A, surface_B, position
     for i = 1, max, 1 do
         local pipe_index = surface_name_A .. '_' .. positions[i].pipes[1][1] .. '_' .. positions[i].pipes[1][2]
 
-        if ctx.stairs.pipe_pairs[pipe_index] and ctx.stairs.pipe_pairs[pipe_index].valid then goto continue end
+        -- A pair is a plain {A, B} table, so check the two pipes themselves: an
+        -- existing pair is kept, with its fluid, instead of rebuilt on every call.
+        local pair = ctx.stairs.pipe_pairs[pipe_index]
+        if pair and pair.A and pair.A.valid and pair.B and pair.B.valid then goto continue end
 
         --- destroy what's existing in pipe position
         local to_remove = surface_A.find_entities_filtered {position = positions[i].pipes[1], type = {"character", "rocket-silo-rocket", "cargo-pod"}, invert = true}
