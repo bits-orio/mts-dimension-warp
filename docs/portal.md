@@ -31,7 +31,7 @@ Playable and in active development, running on public multiplayer servers. The p
 
 ## Compatibility
 
-Requires Factorio 2.0 and [Multi-Team Support](https://mods.factorio.com/mod/multi-team-support). Space Age is optional and auto-detected. Some flavour, like the frozen docking-bay visual, is Space-Age-only. Optional support for [Krastorio 2](https://mods.factorio.com/mod/Krastorio2), [Alien Biomes](https://mods.factorio.com/mod/alien-biomes), [AAI Containers](https://mods.factorio.com/mod/aai-containers), [Factorissimo](https://mods.factorio.com/mod/factorissimo-2-notnotmelon), [Rampant Fixed](https://mods.factorio.com/mod/RampantFixed) and the biter-variant mods. The original [Dimension Warp](https://mods.factorio.com/mod/dimension-warp) mod page remains the source of truth for the detail of the warp gameplay itself, and all of it applies here.
+Requires Factorio 2.1 and [Multi-Team Support](https://mods.factorio.com/mod/multi-team-support). Space Age is optional and auto-detected. With Space Age, an Aquilo world freezes every building that is not heated, as on Aquilo itself; a host setting turns that off. Some flavour, like the frozen docking-bay visual, is Space-Age-only. Optional support for [Krastorio 2](https://mods.factorio.com/mod/Krastorio2), [Alien Biomes](https://mods.factorio.com/mod/alien-biomes), [AAI Containers](https://mods.factorio.com/mod/aai-containers), [Factorissimo](https://mods.factorio.com/mod/factorissimo-2-notnotmelon), [Rampant Fixed](https://mods.factorio.com/mod/RampantFixed) and the biter-variant mods. The original [Dimension Warp](https://mods.factorio.com/mod/dimension-warp) mod page remains the source of truth for the detail of the warp gameplay itself, and all of it applies here.
 
 ## Works with
 
