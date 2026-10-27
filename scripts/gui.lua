@@ -34,6 +34,14 @@ local function effective_team_ctx(player)
     return nil
 end
 
+-- A planet's display name. MTS's per-team planet copies (mts-vulcanus-1) have no
+-- space-location-name.<name> key, only a localised_name on the prototype
+-- ("Vulcanus 1"), so read that; a name that is not a planet shows as is.
+local function planet_display_name(planet_name)
+    local planet = game.planets[planet_name]
+    return planet and planet.prototype.localised_name or planet_name
+end
+
 local function get_player_gui_settings(player)
     local player_settings = settings.get_player_settings(player)
     return {
@@ -100,7 +108,7 @@ local function get_warp_frame(player)
 
     for _, planet in pairs(game.planets) do
         if not utils.ignore_planet(planet.name) and player.force.is_space_location_unlocked(planet.name) then
-            destination_list["preferred-" .. planet.name] = destination_flow["preferred-" .. planet.name] or destination_flow.add{type="sprite-button", name="preferred-" .. planet.name, sprite="space-location." .. planet.name, tooltip = {"space-location-name." .. planet.name}, auto_toggle=true}
+            destination_list["preferred-" .. planet.name] = destination_flow["preferred-" .. planet.name] or destination_flow.add{type="sprite-button", name="preferred-" .. planet.name, sprite="space-location." .. planet.name, tooltip = planet.prototype.localised_name, auto_toggle=true}
             destination_list["preferred-" .. planet.name].style.width = 25
             destination_list["preferred-" .. planet.name].style.height = 25
             destination_list["preferred-" .. planet.name].style.padding = 0
@@ -559,7 +567,7 @@ local function update()
         frame.surface_evolution.visible = player_gui_settings.info_evolution and (ctx.nauvis_lab_exploded or false)
         frame.destination_flow.visible = player_gui_settings.planet_selector and ctx.gui.planet_selector_enabled
 
-        frame.surface.caption = {"dw-gui.planet", ctx.warp.current.planet, {"space-location-name." .. ctx.warp.current.planet}, ctx.warp.randomizer or "normal"}
+        frame.surface.caption = {"dw-gui.planet", ctx.warp.current.planet, planet_display_name(ctx.warp.current.planet), ctx.warp.randomizer or "normal"}
         -- Display the dimension as number + 1 to match original DW: DW's on_init
         -- ran one generate_surface (bumping its stored number 0 -> 1) before the
         -- panel showed, so its home platform read "Dimension 1". MDW adopts warp
