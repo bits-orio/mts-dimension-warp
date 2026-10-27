@@ -128,6 +128,11 @@ local function count_stored_items(force_name, ctx)
     end
     ctx.gui.item_list = item_list
 
+    -- Nothing watched (the default): there is nothing to count, so skip scanning
+    -- every container on every floor. Changing a watched item updates the GUI
+    -- itself (gui.lua item_watch_changed).
+    if not next(item_list) then return end
+
     local force = game.forces[force_name]
     if not force then return end
 
