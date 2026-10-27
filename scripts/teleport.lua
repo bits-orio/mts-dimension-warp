@@ -22,6 +22,32 @@ local function ctx_for_surface(surface)
     return dw.warp_ctx(owner), owner
 end
 
+-- Since Factorio 2.1, LuaPlayer.teleport on a player in remote view moves only
+-- the camera and leaves the body where it was (2.0 exited remote view and moved
+-- the body). Moving a camera is all carry_view wants: one looking at `from` is
+-- put on the same spot of `to`, so the player stays in remote view and keeps
+-- watching the same part of the platform.
+local function carry_view(player, from, to)
+    if player.controller_type ~= defines.controllers.remote then return end
+    if player.surface.index ~= from.index then return end
+    player.teleport(player.position, to)
+end
+dw.carry_view = carry_view
+
+-- A remote-view player's body is the character entity, so move that directly:
+-- teleporting the player would move only the camera and strand the body on a
+-- world the warp retires. The camera follows only if it was on the body's world.
+local function move(player_or_vehicle, controller_type, position, surface)
+    local character = controller_type == defines.controllers.remote and player_or_vehicle.character
+    if character and character.valid then
+        local from = character.surface
+        character.teleport(position, surface)
+        carry_view(player_or_vehicle, from, surface)
+    else
+        player_or_vehicle.teleport(position, surface)
+    end
+end
+
 --- contain everything related to player teleport between surfaces
 local function safe_teleport(player_or_vehicle, surface, position, force_teleport)
     position = {x = position.x or position[1], y = position.y or position[2]}
@@ -43,7 +69,7 @@ local function safe_teleport(player_or_vehicle, surface, position, force_telepor
     end
 
     position = surface.find_non_colliding_position(type, position, 5, 0.5, false) or position
-    player_or_vehicle.teleport(position, surface)
+    move(player_or_vehicle, controller_type, position, surface)
 
     -- Record anti-spam against the teleporting player's team context (fall back to
     -- the destination's team for vehicles, whose force may not be a tracked team).

@@ -266,6 +266,14 @@ local function teleport_platform(force_name, ctx)
         end
     end
 
+    --- Remote-view cameras still on the old world follow the platform: a member
+    --- watching it from another floor, a rider whose car moved above, a spectator
+    --- from another team. Left there, the engine throws each of them back to their
+    --- body when the old world is retired.
+    for _, player in pairs(game.connected_players) do
+        dw.carry_view(player, source, destination)
+    end
+
     -- Retire the previous surface for THIS team (idempotent with warp.lua's own
     -- post-clone call: the first invocation flips ctx.warp.status to awaiting, so
     -- the other is a guarded no-op -- exactly one retire happens).
