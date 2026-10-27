@@ -1,7 +1,6 @@
 require 'prototypes.updates.stack-size'
 require 'prototypes.updates.spoilage'
 require 'prototypes.updates.adjust-restrictions'
-require 'prototypes.updates.pipes'
 require 'prototypes.updates.ammo'
 
 if mods['space-age'] then

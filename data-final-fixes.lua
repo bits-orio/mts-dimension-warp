@@ -1,5 +1,6 @@
 -- change default import for items when importing on space platform.
 require 'prototypes.update-final.collision'
+require 'prototypes.update-final.pipeline-extent'
 
 if mods['space-age'] then
     for _, planet in pairs(data.raw.planet) do
