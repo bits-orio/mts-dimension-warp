@@ -64,6 +64,10 @@ local function force_map_settings()
     game.map_settings.enemy_expansion.enabled = true
     game.map_settings.enemy_expansion.settler_group_min_size = 1
     game.map_settings.enemy_expansion.settler_group_max_size = 1
+    -- Factorio 2.1 multiplies the settler group by this to the power of the
+    -- evolution factor (default 8, so 1 settler became 8 at full evolution);
+    -- 1 keeps the single settlers asked for above.
+    game.map_settings.enemy_expansion.evolution_group_size_factor = 1
 end
 
 ------------------------------------------------------------
