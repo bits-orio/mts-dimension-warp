@@ -74,16 +74,44 @@ end
 --- The existing dw.register_event("on_nth_tick_XXX", ...) path is unchanged: any
 --- handler NOT ported to register_team_tick still fires once as a singleton, exactly
 --- as before. Only NEW per-team handlers (slice 3+) opt into this facility.
+---
+--- Each team's call runs under xpcall, so an error in one team's handler does not
+--- end the game for every team on the server. The first error logs its traceback,
+--- tells that team, and switches that one handler off for that team; the other
+--- handlers and the other teams keep running. on_configuration_changed (a mod
+--- update, which may carry the fix) switches them back on. The latch key is the
+--- handler's registration order, which is the same on every machine because
+--- handlers register while control.lua is parsed.
+local team_tick_count = 0
+
+local function contain_team_error(force_name, ctx, key, err)
+    ctx.failed_handlers = ctx.failed_handlers or {}
+    ctx.failed_handlers[key] = game.tick
+    log("Error in team handler " .. key .. " for " .. force_name
+        .. ", switched off for that team until the next mod update: " .. tostring(err))
+    local force = game.forces[force_name]
+    if force and force.valid then force.print({"dw-messages.team-script-error"}) end
+end
+
 dw.register_team_tick = function(nth, fn)
+    team_tick_count = team_tick_count + 1
+    local key = "nth" .. nth .. "#" .. team_tick_count
     dw.register_event("on_nth_tick_" .. nth, function(event_data)
         -- storage.teams may not exist before on_init; guard so an early tick is a
         -- no-op rather than an error.
         if not storage.teams then return end
         for force_name, ctx in pairs(storage.teams) do
-            fn(force_name, ctx, event_data)
+            if not (ctx.failed_handlers and ctx.failed_handlers[key]) then
+                local ok, err = xpcall(fn, debug.traceback, force_name, ctx, event_data)
+                if not ok then contain_team_error(force_name, ctx, key, err) end
+            end
         end
     end)
 end
+
+dw.register_event("on_configuration_changed", function()
+    for _, ctx in pairs(storage.teams or {}) do ctx.failed_handlers = nil end
+end)
 
 script.on_init(function(event) dw.fire_event("on_init", event) end)
 script.on_load(function(event) dw.fire_event("on_load", event) end)
