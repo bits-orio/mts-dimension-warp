@@ -15,7 +15,7 @@ local mts_lifecycle = require "scripts.mts_lifecycle"
 -- mechanical port onto warp_ctx(force_name) is a later phase.
 
 -- on_init / on_configuration_changed: ensure storage shape, then setup() which
--- remote.calls + caches the mts-v1 event ids and registers the handlers.
+-- registers the mts-v1 event handlers and re-asserts surface ownership.
 local function init_mts_lifecycle()
     dw.init_warp_ctx_storage()
     mts_lifecycle.setup()
@@ -29,8 +29,8 @@ dw.register_event('on_configuration_changed', init_mts_lifecycle)
 -- so it only matters on on_configuration_changed.
 dw.register_event('on_configuration_changed', dw.regate_existing_teams)
 
--- on_load: NO remote.call / NO storage writes -- just re-attach handlers from
--- the event ids cached in storage during on_init/on_configuration_changed.
+-- on_load: no storage writes. register() looks the mts-v1 event ids up again
+-- (remote.call is legal in on_load) so every peer attaches the same handlers.
 dw.register_event('on_load', mts_lifecycle.register)
 
 ------------------------------------------------------------

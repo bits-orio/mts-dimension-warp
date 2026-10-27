@@ -10,19 +10,16 @@
 --                             the warp loop itself is a later slice).
 --   on_team_released       -> tear the team's warp context down.
 --
--- Subscription pattern (multiplayer-safe -- see the MTS event-subscription
--- reference): the event ids come from script.generate_event_name() inside MTS,
--- so they must be fetched with remote.call("mts-v1","get_event_id",name). That
--- call is illegal in the control.lua main chunk and in on_load, so:
---   * setup()    : on_init / on_configuration_changed only -- remote.call the
---                  ids and CACHE them in storage, then register the handlers.
---   * register() : on_init / on_load / on_configuration_changed -- re-attach the
---                  handlers from the cached ids (NO remote.call).
--- Registering from cached ids in all three hooks keeps the handler set identical
--- on every peer the instant on_load finishes, so a client joining mid-game is
--- not rejected. (A deferred one-shot on_nth_tick would make the handler sets
--- diverge between a long-running server and a fresh client -- the bug this
--- pattern exists to avoid.)
+-- Subscription pattern (multiplayer-safe): the event ids come from
+-- script.generate_event_name() inside MTS, so they are fetched with
+-- remote.call("mts-v1","get_event_id",name). That call is illegal only in the
+-- control.lua main chunk; it works in on_init, on_configuration_changed and
+-- on_load. register() looks the ids up and attaches the handlers in all three,
+-- every session, and never caches them: an id cached in storage goes stale when
+-- the mod set changes (a Factorio update adds mods too), the server then
+-- registers the old numbers and every joining client is refused for a script
+-- event mismatch. (A deferred one-shot on_nth_tick would also make the handler
+-- sets diverge between a long-running server and a fresh client.)
 
 dw = dw or {}
 
@@ -194,43 +191,35 @@ local function on_team_released(event)
 end
 
 ------------------------------------------------------------
---- Registration (no remote.call -- safe in on_init/on_load/on_config)
+--- Registration (on_init, on_configuration_changed and on_load)
 ------------------------------------------------------------
--- Re-attach the handlers from the event ids cached in storage. Idempotent and
--- deterministic, so every peer ends up with the same handler set.
+local HANDLERS = {
+    on_team_created         = on_team_created,
+    on_team_surface_created = on_team_surface_created,
+    on_team_clock_started   = on_team_clock_started,
+    on_team_released        = on_team_released,
+}
+
+-- Look each id up from MTS and attach its handler, in every session. The ids
+-- are the ones MTS generated this session, identical on every peer, so the
+-- handler set always matches between a server and a joining client.
 function mts_lifecycle.register()
-    local ids = storage.mts_event_ids
-    if not ids then return end
-    if ids.on_team_created then
-        script.on_event(ids.on_team_created, on_team_created)
-    end
-    if ids.on_team_surface_created then
-        script.on_event(ids.on_team_surface_created, on_team_surface_created)
-    end
-    if ids.on_team_clock_started then
-        script.on_event(ids.on_team_clock_started, on_team_clock_started)
-    end
-    if ids.on_team_released then
-        script.on_event(ids.on_team_released, on_team_released)
+    local iface = remote.interfaces["mts-v1"]
+    if not (iface and iface.get_event_id) then return end
+    for name, handler in pairs(HANDLERS) do
+        local id = remote.call("mts-v1", "get_event_id", name)
+        if id then script.on_event(id, handler) end
     end
 end
 
 ------------------------------------------------------------
---- Setup (remote.call -- on_init/on_configuration_changed only)
+--- Setup (on_init / on_configuration_changed)
 ------------------------------------------------------------
--- Fetch and cache the mts-v1 event ids, then register. The ids can shift only
--- when the mod set changes, which is exactly when on_configuration_changed
--- fires -- so re-fetching here keeps them current.
+-- Register, then re-assert surface ownership. storage.mts_event_ids is the
+-- cache earlier versions kept: dropped, since a cached id goes stale whenever
+-- the mod set changes and on_load then registered the old numbers.
 function mts_lifecycle.setup()
-    local iface = remote.interfaces["mts-v1"]
-    if iface and iface.get_event_id then
-        storage.mts_event_ids = {
-            on_team_created         = remote.call("mts-v1", "get_event_id", "on_team_created"),
-            on_team_surface_created = remote.call("mts-v1", "get_event_id", "on_team_surface_created"),
-            on_team_clock_started   = remote.call("mts-v1", "get_event_id", "on_team_clock_started"),
-            on_team_released        = remote.call("mts-v1", "get_event_id", "on_team_released"),
-        }
-    end
+    storage.mts_event_ids = nil
     mts_lifecycle.register()
     mts_lifecycle.reassert_surface_owners()
 end
