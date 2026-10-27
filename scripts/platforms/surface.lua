@@ -65,8 +65,9 @@ local function leave_behind(character, force_name)
     local owner = character.player or character.associated_player
     local announce = game.player_death_notifications_enabled
     game.player_death_notifications_enabled = false
-    character.die()
-    game.player_death_notifications_enabled = announce
+    local ok, err = pcall(character.die)
+    game.player_death_notifications_enabled = announce   -- restored on every path
+    if not ok then error(err) end
     local force = game.forces[force_name]
     if owner and force then force.print({"dw-messages.left-behind", owner.name}) end
 end
