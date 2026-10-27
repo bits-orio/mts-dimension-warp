@@ -325,6 +325,12 @@ end
 -- MTS deletes the actual surfaces; this only releases the per-team state so a
 -- recycled force name starts clean.
 function dw.destroy_warp_ctx(force_name)
+    -- A stowed mobile gate holds its chests' stacks in script inventories, which
+    -- live until destroyed: free them with the team.
+    local ctx = storage.teams and storage.teams[force_name]
+    for _, held in pairs(ctx and ctx.warpgate and ctx.warpgate.mobile_chests or {}) do
+        if type(held) ~= "table" and held.valid then held.destroy() end
+    end
     if storage.teams then storage.teams[force_name] = nil end
     dw.clear_surfaces_for_force(force_name)
 end
