@@ -36,7 +36,7 @@ local function get_allowed_planet(force_name, ctx)
         force_name, tostring(current_planet_name), tostring(current_require_heat))
     for _, planet in pairs(game.planets) do
         -- remove nauvis, dimension surfaces from the list
-        if not utils.ignore_planet(planet.name) then
+        if not utils.ignore_planet(planet.name, ctx.victory) then
             if force.is_space_location_unlocked(planet.name) then
                 if current_require_heat and planet.name == current_planet_name then
                     goto continue
@@ -71,9 +71,12 @@ local function select_destination(force_name, ctx)
         return "nauvis"
     end
     if ctx.warp.preferred_destination then
-        if ctx.warp.preferred_destination == "nauvis" then
-            dw.diag("select_destination[%s]: preferred=nauvis -> nauvis (allowed=%d)", force_name, total_dest)
-            return "nauvis"
+        -- The team's own copy of Nauvis (mts-nauvis-N): the bare base planet is
+        -- held by the real nauvis surface, so a world created on it never gets
+        -- its planet.
+        if utils.base_planet(ctx.warp.preferred_destination) == "nauvis" then
+            dw.diag("select_destination[%s]: preferred=%s (nauvis) (allowed=%d)", force_name, ctx.warp.preferred_destination, total_dest)
+            return ctx.warp.preferred_destination
         end
         for _, dest in pairs(destinations) do
             if dest == ctx.warp.preferred_destination then
@@ -297,7 +300,7 @@ local function warp_timer(force_name, ctx)
                 tostring(manual), ctx.votes.count, ctx.votes.min_vote)
 
             local target = select_destination(force_name, ctx)
-            if target == "nauvis" and ctx.warp.current.planet == "nauvis" then
+            if utils.base_planet(target) == "nauvis" and utils.base_planet(ctx.warp.current.planet) == "nauvis" then
                 dw.diag("warp_timer[%s]: STAY on nauvis (target=nauvis, already on nauvis)", force_name)
                 game.forces[force_name].print({"dw-messages.stay-on-nauvis"})
                 reset_timer_vote(ctx)
@@ -318,23 +321,28 @@ local function warp_timer(force_name, ctx)
                 dw.platforms.recall_harvester(force_name, ctx, "left")
                 dw.platforms.recall_harvester(force_name, ctx, "right")
 
-                -- generate new surface and teleport
-                prepare_warp_to_next_surface(force_name, ctx, target)
-                -- play sound (for the warping team only)
-                play_team_sound(force_name, {path = "dw-warpdrive"})
-                if ctx.warp.message then game.print({ctx.warp.message}) end
-                ctx.warp.message = nil
+                -- generate new surface and teleport. If no new world was made (MTS
+                -- refused the surface), the team has not moved: skip the arrival
+                -- steps, keep the timer expired, and the next check tries again.
+                if prepare_warp_to_next_surface(force_name, ctx, target) then
+                    -- play sound (for the warping team only)
+                    play_team_sound(force_name, {path = "dw-warpdrive"})
+                    if ctx.warp.message then game.print({ctx.warp.message}) end
+                    ctx.warp.message = nil
 
-                reset_timer_vote(ctx)
+                    reset_timer_vote(ctx)
 
-                -- reset evolution based on warp number (per-team surface)
-                dw.set_warp_evolution_factor(force_name, ctx)
-                ctx.pollution = 1
-                dw.gui.update_manual_warp_button()
+                    -- reset evolution based on warp number (per-team surface)
+                    dw.set_warp_evolution_factor(force_name, ctx)
+                    ctx.pollution = 1
+                    dw.gui.update_manual_warp_button()
 
-                -- once everything's done, force recreate the tiles in platforms (because some explosions may break some.)
-                dw.update_warp_platform_size(force_name, ctx)
-                post_arrive_reinit(force_name, ctx)
+                    -- once everything's done, force recreate the tiles in platforms (because some explosions may break some.)
+                    dw.update_warp_platform_size(force_name, ctx)
+                    post_arrive_reinit(force_name, ctx)
+                else
+                    dw.diag("warp_timer[%s]: no new world for %s, the team stays and retries", force_name, tostring(target))
+                end
             end
         end
     elseif ctx.timer.evict then

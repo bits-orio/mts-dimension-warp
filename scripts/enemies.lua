@@ -86,7 +86,7 @@ local function set_warp_evolution_factor(force_name, ctx)
 	-- warp 100 = 0.23, 150 = 0.358, 200 = 0.505, 250 = 0.689, 300 = 0.94, 310+ = 1
 	local pentapod_evolution = math.min(100, 1.8 ^ (ctx.warp.number / 50) + ctx.warp.number / 5) / 100
 
-	if ctx.warp.current.planet ~= "gleba" then
+	if utils.base_planet(ctx.warp.current.planet) ~= "gleba" then
 		game.forces.enemy.set_evolution_factor(biter_evolution, ctx.warp.current.surface)
 	else
 		game.forces.enemy.set_evolution_factor(pentapod_evolution, ctx.warp.current.surface)

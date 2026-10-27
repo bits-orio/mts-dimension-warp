@@ -147,7 +147,10 @@ local function generate_surface(force_name, ctx, target)
     local base_mapgen = (planet_proto and planet_proto.map_gen_settings)
         or game.surfaces.nauvis.map_gen_settings
     local mapgen = table.deepcopy(base_mapgen)
-    mapgen.seed = fairness_seed(planet, next_number)
+    -- Seed by the BASE planet: the team's copy (mts-vulcanus-3) carries its slot,
+    -- and ADR-0005 wants the same world for every team at the same warp number.
+    -- MTS's copies keep the base planet's terrain settings, so the worlds match.
+    mapgen.seed = fairness_seed(utils.base_planet(planet), next_number)
 
     dw.diag("generate_surface force=%s planet=%s next_number=%d seed=%d",
         force_name, planet, next_number, mapgen.seed)
@@ -162,11 +165,13 @@ local function generate_surface(force_name, ctx, target)
     -- makes the adoption correctly skip it.
     --
     -- The name MUST be NON-VARIANT (not mts-<planet>-N / team-N-<planet>) so MTS's
-    -- normalize_variant_seed honors our deterministic seed. 'mdw-<planet>-w<N>' is
-    -- unique per (planet, warp) and never matches a variant pattern -- NO
+    -- normalize_variant_seed honors our deterministic seed, and it carries the team
+    -- like the home, floor and dock names do: two teams reach the same planet at
+    -- the same warp number by design (ADR-0005), and MTS refuses a name another
+    -- team owns. 'mdw-<force>-<planet>-w<N>' never matches a variant pattern -- NO
     -- post-create re-pin is needed (ADR-0005 fairness holds from birth).
     local surface_name = remote.call("mts-v1", "create_team_surface", force_name, {
-        name             = 'mdw-' .. planet .. '-w' .. next_number,
+        name             = 'mdw-' .. force_name .. '-' .. utils.base_planet(planet) .. '-w' .. next_number,
         planet           = planet,
         map_gen_settings = mapgen,
     })

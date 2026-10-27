@@ -9,18 +9,24 @@ utils = {} or utils
 utils.dimension_planets = { produstia = true, smeltus = true, electria = true }
 
 
--- return if we should ignore the planet for warp selection
-function utils.ignore_planet(planet)
+-- MTS gives every team its own copy of each planet, named mts-<base>-<slot>
+-- (mts-vulcanus-3), and those copies are what a team unlocks and warps to. Rules
+-- about a planet (which one it is, the fairness seed, Gleba's evolution curve)
+-- go by the base name; only creating the surface needs the team's copy.
+function utils.base_planet(name)
+    return name and (name:match("^mts%-(.+)%-%d+$") or name)
+end
+
+-- return if we should ignore the planet for warp selection. victory is the
+-- team's own (ADR-0007): Nauvis becomes a destination once that team has won.
+function utils.ignore_planet(planet, victory)
+    local base = utils.base_planet(planet)
     -- ignore nauvis
-    if planet == "nauvis" and not storage.victory then return true end
+    if base == "nauvis" and not victory then return true end
     -- ignore the factory/mining/power dimension worlds (floors, not destinations).
-    -- Planet names come as the per-variant "mts-<base>-<N>" (e.g. mts-produstia-7)
-    -- as well as the bare base, so match the dimension base name as a substring.
-    for base in pairs(utils.dimension_planets) do
-        if planet:find(base, 1, true) then return true end
-    end
+    if utils.dimension_planets[base] then return true end
     -- ignore specials surface frm the mod
-    if dw.safe_surfaces[planet] then return true end
+    if dw.safe_surfaces[base] then return true end
     if planet:match('.*%-factory%-floor') or planet:match('factory%-travel%-surface') then return true end
     return false
 end

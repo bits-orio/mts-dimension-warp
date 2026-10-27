@@ -107,7 +107,7 @@ local function get_warp_frame(player)
     ctx.gui.planet_selector_list["preferred-none"] = true
 
     for _, planet in pairs(game.planets) do
-        if not utils.ignore_planet(planet.name) and player.force.is_space_location_unlocked(planet.name) then
+        if not utils.ignore_planet(planet.name, ctx.victory) and player.force.is_space_location_unlocked(planet.name) then
             destination_list["preferred-" .. planet.name] = destination_flow["preferred-" .. planet.name] or destination_flow.add{type="sprite-button", name="preferred-" .. planet.name, sprite="space-location." .. planet.name, tooltip = planet.prototype.localised_name, auto_toggle=true}
             destination_list["preferred-" .. planet.name].style.width = 25
             destination_list["preferred-" .. planet.name].style.height = 25
