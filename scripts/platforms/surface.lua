@@ -37,6 +37,20 @@ local function update_warp_platform_size(force_name, ctx)
 end
 dw.update_warp_platform_size = update_warp_platform_size
 
+-- A member left off the platform dies with the world the warp retires. The
+-- engine would announce that death to every team on the server; since Factorio
+-- 2.1.21 the announcement can be switched off, and it is checked when die()
+-- runs, so it is off for just this kill and the member's own team is told.
+local function leave_behind(character, force_name)
+    local owner = character.player or character.associated_player
+    local announce = game.player_death_notifications_enabled
+    game.player_death_notifications_enabled = false
+    character.die()
+    game.player_death_notifications_enabled = announce
+    local force = game.forces[force_name]
+    if owner and force then force.print({"dw-messages.left-behind", owner.name}) end
+end
+
 -- v1 CORE port: PER-TEAM platform clone. Threaded (force_name, ctx) from the
 -- warp.lua call site (dw.teleport_platform(force_name, ctx)). Every flat
 -- storage.warp.* / storage.platform.* read is now ctx.warp.* / ctx.platform.*
@@ -148,7 +162,7 @@ local function teleport_platform(force_name, ctx)
                 -- "leaving nauvis -> keep them" exception anymore. Guard the character:
                 -- a ghost/spectator-controller player has none.
                 if player.character and player.character.valid then
-                    player.character.die()
+                    leave_behind(player.character, force_name)
                 end
             end
         end
@@ -173,7 +187,7 @@ local function teleport_platform(force_name, ctx)
             if math2d.bounding_box.contains_point(platform_area_delta, char.position) then
                 dw.safe_teleport(char, destination, char.position, true)   -- move the body
             else
-                char.die()   -- left behind on the retired source -> respawn on reconnect
+                leave_behind(char, force_name)   -- left behind on the retired source -> respawn on reconnect
             end
         end
     end

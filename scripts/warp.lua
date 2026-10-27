@@ -299,7 +299,7 @@ local function warp_timer(force_name, ctx)
             local target = select_destination(force_name, ctx)
             if target == "nauvis" and ctx.warp.current.planet == "nauvis" then
                 dw.diag("warp_timer[%s]: STAY on nauvis (target=nauvis, already on nauvis)", force_name)
-                game.print({"dw-messages.stay-on-nauvis"})
+                game.forces[force_name].print({"dw-messages.stay-on-nauvis"})
                 reset_timer_vote(ctx)
                 dw.gui.update_manual_warp_button()
             elseif not team_is_online(force_name, ctx) then
