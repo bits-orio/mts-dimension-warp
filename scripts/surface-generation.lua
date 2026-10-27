@@ -69,6 +69,9 @@ local function force_map_settings()
     -- 1 keeps the single settlers asked for above.
     game.map_settings.enemy_expansion.evolution_group_size_factor = 1
 end
+-- Applied on every warp, and on a configuration change so an upgraded save has
+-- them (2.1's settler factor above) before its next warp.
+dw.register_event('on_configuration_changed', force_map_settings)
 
 ------------------------------------------------------------
 --- Deterministic fairness seed (ADR-0005)
