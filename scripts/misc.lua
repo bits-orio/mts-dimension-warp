@@ -157,7 +157,7 @@ local function count_stored_items(force_name, ctx)
     end
 
     -- update GUI
-    dw.gui.update_watchdogs_gui()
+    dw.gui.update_watchdogs_gui(force_name)
 end
 
 dw.register_event(defines.events.on_player_changed_position, check_cheat_bag)

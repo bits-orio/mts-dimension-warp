@@ -106,7 +106,11 @@ local function get_warp_frame(player)
     destination_list.none.style.margin = 0
     ctx.gui.planet_selector_list["preferred-none"] = true
 
-    for _, planet in pairs(game.planets) do
+    -- The selector walks every planet (with MTS's per-team copies, about 190),
+    -- so only while it is shown; it is hidden for most of the game.
+    local player_gui_settings = get_player_gui_settings(player)
+    local selector_shown = player_gui_settings.planet_selector and ctx.gui.planet_selector_enabled
+    for _, planet in pairs(selector_shown and game.planets or {}) do
         if not utils.ignore_planet(planet.name, ctx.victory) and player.force.is_space_location_unlocked(planet.name) then
             destination_list["preferred-" .. planet.name] = destination_flow["preferred-" .. planet.name] or destination_flow.add{type="sprite-button", name="preferred-" .. planet.name, sprite="space-location." .. planet.name, tooltip = planet.prototype.localised_name, auto_toggle=true}
             destination_list["preferred-" .. planet.name].style.width = 25
@@ -120,14 +124,13 @@ local function get_warp_frame(player)
     -- nauvis_lab_exploded is set per-team by mts_lifecycle warp #0 adoption (the
     -- flat storage.nauvis_lab_exploded is NEVER set -- lab_intro is disabled -- so
     -- gating on it would keep the whole info GUI hidden forever).
-    local player_gui_settings = get_player_gui_settings(player)
     surfaceflow.visible = player_gui_settings.info_planet and (ctx.nauvis_lab_exploded or false)
     dimensionflow.visible = player_gui_settings.info_dimension and (ctx.nauvis_lab_exploded or false)
     surface_time.visible = player_gui_settings.info_planet_clock and (ctx.nauvis_lab_exploded or false)
     surface_evolution.visible = player_gui_settings.info_evolution and (ctx.nauvis_lab_exploded or false)
     warpflow.visible = player_gui_settings.info_warp_timer and ctx.timer.active and not ctx.victory
     manualwarpflow.visible = player_gui_settings.info_manual_timer and ctx.timer.active
-    destination_flow.visible = player_gui_settings.planet_selector and ctx.gui.planet_selector_enabled
+    destination_flow.visible = selector_shown
     warp_button.visible = ctx.timer.active
 
     return warp_frame
@@ -399,8 +402,10 @@ end
 --- Update the watchdogs labels to display the actual item quantity. Single global
 --- handler: each connected player's labels reflect their OWN team's ctx.gui counts
 --- (item_watch + item_list, written by misc.lua). Non-team players are skipped.
-local function update_watchdogs_gui()
+-- force_name limits the refresh to that team's players (each team calls it).
+local function update_watchdogs_gui(force_name)
     for _, player in pairs(game.connected_players) do
+        if force_name and player.force.name ~= force_name then goto continue end
         local ctx = ctx_for_player(player)
         if not ctx then goto continue end
 
@@ -543,8 +548,11 @@ dw.register_event("on_nth_tick_60", dock_prompt_driver)
 --- Update all the GUI information (except items). Single global handler: iterate
 --- connected players and refresh each one's warp frame against their OWN team's
 --- ctx. Non-team players have no ctx (and a hidden warp frame), so skip them.
-local function update()
+-- Called by each team's warp_timer every second: force_name limits the refresh
+-- to that team's players, so a second costs teams x members, not teams x everyone.
+local function update(force_name)
     for _, player in pairs(game.connected_players) do
+        if force_name and player.force.name ~= force_name then goto continue end
         local ctx = ctx_for_player(player)
         if not ctx then goto continue end
 

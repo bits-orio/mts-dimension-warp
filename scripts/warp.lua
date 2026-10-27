@@ -371,7 +371,7 @@ local function warp_timer(force_name, ctx)
     end
 
     --- each seconds, we update the GUI
-    dw.gui.update()
+    dw.gui.update(force_name)
 end
 dw.warp.warp_timer = warp_timer
 
