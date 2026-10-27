@@ -188,15 +188,18 @@ local function respawn_in_factory(event)
 end
 
 
---- make sure new players are teleported to the new surface
+--- A member who connects anywhere but one of their team's own surfaces goes to
+--- the current warp surface. On the platform, a floor or the dock they stay
+--- where they logged out: upstream checked dw.safe_surfaces, which is keyed by
+--- bare planet names (produstia...) that MDW's per-team surface names never
+--- match, so every reconnect sent the member to the middle of the platform.
 local function teleport_safely_player_on_event(event)
     local player = game.players[event.player_index]
 
-    --- make sure to teleport any new player to the current warp surface
     if dw.has_warp_ctx(player.force.name) then
         local ctx = dw.warp_ctx(player.force.name)
         if ctx.nauvis_lab_exploded and ctx.warp.current.surface then
-            if not dw.safe_surfaces[player.surface.name] then
+            if dw.surface_owner(player.physical_surface.index) ~= player.force.name then
                 safe_teleport(player, ctx.warp.current.surface, {0, 0}, true)
             end
         end
