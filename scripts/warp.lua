@@ -233,6 +233,15 @@ dw.warp.depart_to_dock = depart_to_dock
 -- repaired explosion damage (cosmetic) and wiped any concrete players had laid.
 local function post_arrive_reinit(force_name, ctx)
     dw.platform_force_update_entities(force_name, ctx)
+
+    -- generate_surface records whether the new world was tied to a heating
+    -- planet; tell the team what freezes there on every such arrival.
+    local current = ctx.warp.current
+    if current.freezes then
+        local base = utils.base_planet(current.planet)
+        game.forces[force_name].print({"dw-messages.heating-planet-arrival",
+            base, {"space-location-name." .. base}})
+    end
 end
 
 -- Play a warp cue (alarm / warpdrive) for the WARPING TEAM's members only, never

@@ -96,6 +96,14 @@ data:extend {
         order = "a-c",
     },
     {
+        type = "string-setting",
+        name = "dw-heating-planets",
+        setting_type = "runtime-global",
+        default_value = "authentic",
+        allowed_values = {"authentic", "off"},
+        order = "a-d",
+    },
+    {
         type = "double-setting",
         name = "dw-helper-pollution-multiplier",
         setting_type = "runtime-global",

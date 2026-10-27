@@ -177,9 +177,16 @@ local function generate_surface(force_name, ctx, target)
     -- the same warp number by design (ADR-0005), and MTS refuses a name another
     -- team owns. 'mdw-<force>-<planet>-w<N>' never matches a variant pattern -- NO
     -- post-create re-pin is needed (ADR-0005 fairness holds from birth).
+    --
+    -- A heating planet (Aquilo) freezes every building that is not heated, but
+    -- only on a surface tied to the planet. With dw-heating-planets off the world
+    -- is not tied, which plays as on Factorio 2.0: no freezing, Nauvis surface
+    -- properties.
+    local heating = planet_proto and planet_proto.entities_require_heating or false
+    local tie_planet = not heating or settings.global['dw-heating-planets'].value == 'authentic'
     local surface_name = remote.call("mts-v1", "create_team_surface", force_name, {
         name             = 'mdw-' .. force_name .. '-' .. utils.base_planet(planet) .. '-w' .. next_number,
-        planet           = planet,
+        planet           = tie_planet and planet or nil,
         map_gen_settings = mapgen,
     })
     dw.diag("generate_surface force=%s create_team_surface returned %s",
@@ -200,6 +207,7 @@ local function generate_surface(force_name, ctx, target)
         planet        = planet,
         surface       = surface,
         surface_index = surface.index,
+        freezes       = heating and tie_planet,
     }
 
     dw.diag("generate_surface force=%s ADVANCED warp #%d -> previous=%s current=%s",
