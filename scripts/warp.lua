@@ -404,6 +404,23 @@ end
 -- airlock window (with an "imminent" ping at ~30s), and forces the deferred warp
 -- out to ctx.warp.pending_destination -- the real Arrive, which advances the warp
 -- number and retires the dock.
+-- MTS keeps a team frozen until every holder of its pause lets go, so an admin's
+-- /mts-pause outlives MDW's resume. A frozen base must never be warped out: MTS's
+-- restore data (accumulator charge, pole wires) is keyed by entity and would not
+-- follow the clone. Hold the dock until the team thaws; tell the team once.
+local function held_by_another_pause(force_name, ctx, force)
+    local ok, paused = pcall(remote.call, 'mts-v1', 'is_team_paused', force_name)
+    if not (ok and paused) then
+        ctx.warp.hold_notified = nil
+        return false
+    end
+    if not ctx.warp.hold_notified and force and force.valid then
+        force.print({"dw-messages.dock-held-paused"})
+        ctx.warp.hold_notified = true
+    end
+    return true
+end
+
 local function dock_timer(force_name, ctx)
     if not ctx.warp.docked then return end
     local force = game.forces[force_name]
@@ -437,6 +454,7 @@ local function dock_timer(force_name, ctx)
     -- First tick after resume: thaw (instant power) + arm the countdown.
     if ctx.timer.dock == nil then
         remote.call('mts-v1', 'unpause_team', force_name)
+        if held_by_another_pause(force_name, ctx, force) then return end
         -- Gather the team's online members onto the dock platform so they travel
         -- with the base when the forced warp fires -- a member who reconnected
         -- elsewhere (e.g. the landing pen) would otherwise be left behind.
@@ -469,6 +487,7 @@ local function dock_timer(force_name, ctx)
         return
     end
 
+    if held_by_another_pause(force_name, ctx, force) then return end
     ctx.timer.dock = ctx.timer.dock - 1
     if ctx.timer.dock == DOCK_IMMINENT_SECONDS and force and force.valid then
         force.print({"dw-messages.dock-imminent"})

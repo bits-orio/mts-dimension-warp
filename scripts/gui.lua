@@ -517,8 +517,13 @@ local function show_dock_prompt(player, ctx)
     if ctx.warp.resume_chosen then
         frame.dw_dock_resume.enabled = false
         local left = ctx.timer.dock
-        frame.status.caption = left and {"dw-gui.dock-status-countdown", math.max(0, math.floor(left))}
-            or {"dw-gui.dock-status-restoring"}
+        if ctx.warp.hold_notified then
+            -- Another pause (an admin's /mts-pause) holds the team; see warp.lua.
+            frame.status.caption = {"dw-gui.dock-status-held"}
+        else
+            frame.status.caption = left and {"dw-gui.dock-status-countdown", math.max(0, math.floor(left))}
+                or {"dw-gui.dock-status-restoring"}
+        end
     else
         frame.dw_dock_resume.enabled = true
         frame.status.caption = ""
