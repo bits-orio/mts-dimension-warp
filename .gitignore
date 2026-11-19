@@ -58,3 +58,6 @@ prototypes/science-pack.lua
 
 # Local test runs (dev/run-*.sh)
 /.run/
+
+# Editor workspace files
+*.code-workspace
