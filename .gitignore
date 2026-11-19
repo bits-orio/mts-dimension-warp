@@ -55,3 +55,6 @@ prototypes/entities/quantum-stabilizer.lua
 prototypes/technologies/dimension-science.lua
 prototypes/technologies/quantum-stabilizer.lua
 prototypes/science-pack.lua
+
+# Local test runs (dev/run-*.sh)
+/.run/

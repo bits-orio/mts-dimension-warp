@@ -1,0 +1,9 @@
+{
+  "name": "mdw-scenario-test",
+  "version": "1.0.0",
+  "title": "MDW scenario test (dev only)",
+  "author": "test harness",
+  "factorio_version": "2.1",
+  "description": "Drives and checks dev/run-scenarios.sh. Never shipped.",
+  "dependencies": ["base", "multi-team-support", "mts-dimension-warp"]
+}
