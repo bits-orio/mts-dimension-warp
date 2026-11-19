@@ -1,4 +1,12 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.9.1
+Date: 19/11/2026
+  Bugfixes:
+    - A docked team that an admin has paused with /mts-pause stays on its dock when a member
+      resumes the warp. The team is told once, the dock window says it is waiting, and the warp
+      out carries on when the pause is lifted. Before, the base was warped out while still
+      frozen.
+---------------------------------------------------------------------------------------------------
 Version: 0.9.0
 Date: 27/10/2026
   Major Features:
